@@ -1,26 +1,41 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f7f8;
+  --color-ink: #171717;
+  --color-ink-2: #525252;
+  --color-muted: #737373;
+  --color-faint: #a3a3a3;
+  --color-border: #e5e5e5;
+  --color-border-2: #f0f0f0;
+  --color-primary: #3b5bdb;
+  --color-primary-tint: #edf2ff;
+  --color-accent-amber: #f59f00;
+  --color-accent-emerald: #0ca678;
+
+  --background: var(--color-bg);
+  --foreground: var(--color-ink);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom subtle scrollbars and clean button utilities */
+::selection {
+  background: #dbe4ff;
+  color: #171717;
 }

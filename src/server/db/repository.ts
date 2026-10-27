@@ -1,4 +1,4 @@
-import { Job } from "@/types/job";
+import { Job, WorkArrangement } from "@/types/job";
 import { JobSource, SourceSyncRun, JobQueryOptions } from "./schema";
 import { DEMO_JOBS } from "@/features/job-search/fixtures";
 
@@ -75,7 +75,7 @@ export class InMemoryJobRepository implements IJobRepository {
         (j) =>
           j.title.toLowerCase().includes(q) ||
           j.company.toLowerCase().includes(q) ||
-          j.descriptionText.toLowerCase().includes(q)
+          j.description.toLowerCase().includes(q)
       );
     }
 
@@ -83,8 +83,8 @@ export class InMemoryJobRepository implements IJobRepository {
       const loc = options.location.toLowerCase();
       results = results.filter(
         (j) =>
-          j.city.toLowerCase().includes(loc) ||
-          j.locationRaw.toLowerCase().includes(loc)
+          (j.normalizedCity && j.normalizedCity.toLowerCase().includes(loc)) ||
+          (j.originalLocation && j.originalLocation.toLowerCase().includes(loc))
       );
     }
 
@@ -93,13 +93,15 @@ export class InMemoryJobRepository implements IJobRepository {
     }
 
     if (options.isRemote !== undefined) {
-      results = results.filter((j) => j.isRemote === options.isRemote);
+      results = results.filter((j) => (j.workArrangement === "remote") === options.isRemote);
     }
 
     if (options.skills && options.skills.length > 0) {
       const targetSkills = options.skills.map((s) => s.toLowerCase());
       results = results.filter((j) =>
-        j.extractedSkills.some((sk) => targetSkills.includes(sk.toLowerCase()))
+        [...j.requiredSkills, ...j.preferredSkills].some((sk) =>
+          targetSkills.includes(sk.toLowerCase())
+        )
       );
     }
 
@@ -119,7 +121,6 @@ export class InMemoryJobRepository implements IJobRepository {
     };
     this.syncRuns.unshift(record);
 
-    // update source lastSyncedAt
     const src = this.sources.find((s) => s.id === run.sourceId);
     if (src) {
       src.lastSyncedAt = record.createdAt;
@@ -180,25 +181,23 @@ export class SupabaseJobRepository implements IJobRepository {
         id: j.id,
         title: j.title,
         company: j.company,
-        company_slug: j.companySlug ?? null,
-        location_raw: j.locationRaw,
-        city: j.city,
-        state: j.state ?? null,
+        location_raw: j.originalLocation,
+        city: j.normalizedCity,
+        state: j.normalizedState,
         country: j.country,
-        is_remote: j.isRemote,
+        is_remote: j.workArrangement === "remote",
         work_arrangement: j.workArrangement,
-        experience_min: j.experienceMin ?? null,
-        experience_max: j.experienceMax ?? null,
-        salary_min: j.salaryMin ?? null,
-        salary_max: j.salaryMax ?? null,
+        experience_min: j.experienceRange?.minYears ?? null,
+        experience_max: j.experienceRange?.maxYears ?? null,
+        salary_min: j.salaryMin,
+        salary_max: j.salaryMax,
         salary_currency: j.salaryCurrency ?? "INR",
-        description_html: j.descriptionHtml,
-        description_text: j.descriptionText,
-        url: j.url,
-        source: j.source,
-        provider: j.provider,
+        description_text: j.description,
+        url: j.originalUrl,
+        source: j.sourceAttribution,
+        provider: j.providerId,
         posted_at: j.postedAt,
-        extracted_skills: j.extractedSkills,
+        extracted_skills: [...j.requiredSkills, ...j.preferredSkills],
         is_active: true,
       }));
 
@@ -210,7 +209,6 @@ export class SupabaseJobRepository implements IJobRepository {
 
       return { inserted: records.length, updated: 0 };
     } catch {
-      // Fallback cleanly to in-memory store if network/credentials fail
       return this.fallback.upsertJobs(jobs);
     }
   }
@@ -220,29 +218,44 @@ export class SupabaseJobRepository implements IJobRepository {
       const rows = await this.fetchSupabase(`jobs?id=eq.${encodeURIComponent(id)}&limit=1`);
       if (!rows || rows.length === 0) return null;
       const row = rows[0];
+      const now = new Date().toISOString();
       return {
         id: row.id,
+        providerId: row.provider || "greenhouse",
+        externalId: row.id.split(":").slice(1).join(":") || row.id,
         title: row.title,
         company: row.company,
-        companySlug: row.company_slug,
-        locationRaw: row.location_raw,
-        city: row.city,
-        state: row.state,
-        country: row.country,
-        isRemote: row.is_remote,
-        workArrangement: row.work_arrangement,
-        experienceMin: row.experience_min,
-        experienceMax: row.experience_max,
+        companyLogoUrl: null,
+        originalUrl: row.url || "",
+        sourceAttribution: row.source || "Greenhouse ATS",
+        originalLocation: row.location_raw,
+        normalizedCity: row.city,
+        normalizedState: row.state,
+        country: row.country || "India",
+        workArrangement: (row.work_arrangement as WorkArrangement) || "on-site",
+        remoteEligibility: row.is_remote ? "Remote eligible" : null,
+        employmentType: "full-time",
+        experienceRange:
+          row.experience_min !== null
+            ? { minYears: row.experience_min, maxYears: row.experience_max }
+            : null,
+        experienceLevel: "mid",
+        requiredSkills: Array.isArray(row.extracted_skills) ? row.extracted_skills : [],
+        preferredSkills: [],
+        requiredQualifications: [],
+        preferredQualifications: [],
+        description: row.description_text || "",
+        responsibilities: [],
         salaryMin: row.salary_min,
         salaryMax: row.salary_max,
         salaryCurrency: row.salary_currency,
-        descriptionHtml: row.description_html,
-        descriptionText: row.description_text,
-        url: row.url,
-        source: row.source,
-        provider: row.provider,
+        salaryPeriod: "yearly",
         postedAt: row.posted_at,
-        extractedSkills: row.extracted_skills || [],
+        firstSeenAt: now,
+        lastSeenAt: now,
+        lastRefreshedAt: now,
+        status: "active",
+        providerMeta: {},
       };
     } catch {
       return this.fallback.getJobById(id);
@@ -258,29 +271,44 @@ export class SupabaseJobRepository implements IJobRepository {
       if (options.isRemote !== undefined) query += `&is_remote=eq.${options.isRemote}`;
 
       const rows = await this.fetchSupabase(query);
+      const now = new Date().toISOString();
       const jobs: Job[] = rows.map((row: Record<string, unknown>) => ({
         id: String(row.id),
+        providerId: String(row.provider || "greenhouse"),
+        externalId: String(row.id).split(":").slice(1).join(":") || String(row.id),
         title: String(row.title),
         company: String(row.company),
-        companySlug: row.company_slug ? String(row.company_slug) : undefined,
-        locationRaw: String(row.location_raw),
-        city: String(row.city),
-        state: row.state ? String(row.state) : undefined,
+        companyLogoUrl: null,
+        originalUrl: String(row.url || ""),
+        sourceAttribution: String(row.source || "Greenhouse ATS"),
+        originalLocation: row.location_raw ? String(row.location_raw) : null,
+        normalizedCity: row.city ? String(row.city) : null,
+        normalizedState: row.state ? String(row.state) : null,
         country: String(row.country || "India"),
-        isRemote: Boolean(row.is_remote),
-        workArrangement: (row.work_arrangement as Job["workArrangement"]) || "On-site",
-        experienceMin: typeof row.experience_min === "number" ? row.experience_min : undefined,
-        experienceMax: typeof row.experience_max === "number" ? row.experience_max : undefined,
-        salaryMin: typeof row.salary_min === "number" ? row.salary_min : undefined,
-        salaryMax: typeof row.salary_max === "number" ? row.salary_max : undefined,
+        workArrangement: (row.work_arrangement as WorkArrangement) || "on-site",
+        remoteEligibility: row.is_remote ? "Remote eligible" : null,
+        employmentType: "full-time",
+        experienceRange:
+          typeof row.experience_min === "number"
+            ? { minYears: row.experience_min, maxYears: typeof row.experience_max === "number" ? row.experience_max : null }
+            : null,
+        experienceLevel: "mid",
+        requiredSkills: Array.isArray(row.extracted_skills) ? (row.extracted_skills as string[]) : [],
+        preferredSkills: [],
+        requiredQualifications: [],
+        preferredQualifications: [],
+        description: String(row.description_text || ""),
+        responsibilities: [],
+        salaryMin: typeof row.salary_min === "number" ? row.salary_min : null,
+        salaryMax: typeof row.salary_max === "number" ? row.salary_max : null,
         salaryCurrency: typeof row.salary_currency === "string" ? row.salary_currency : "INR",
-        descriptionHtml: String(row.description_html || ""),
-        descriptionText: String(row.description_text || ""),
-        url: String(row.url),
-        source: String(row.source),
-        provider: (row.provider as Job["provider"]) || "greenhouse",
-        postedAt: String(row.posted_at || new Date().toISOString()),
-        extractedSkills: Array.isArray(row.extracted_skills) ? (row.extracted_skills as string[]) : [],
+        salaryPeriod: "yearly",
+        postedAt: row.posted_at ? String(row.posted_at) : null,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        lastRefreshedAt: now,
+        status: "active",
+        providerMeta: {},
       }));
 
       return { jobs, total: jobs.length };

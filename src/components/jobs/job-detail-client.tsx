@@ -5,6 +5,7 @@ import { Job } from "@/types/job";
 import { formatSalary, formatTimeAgo } from "@/lib/utils";
 import { useSavedJobs } from "@/features/saved-jobs/useSavedJobs";
 import { useCandidateProfile } from "@/features/matching/useCandidateProfile";
+import { AIMatchAssistant } from "@/components/jobs/ai-match-assistant";
 import {
   MapPin,
   Bookmark,
@@ -200,6 +201,9 @@ export function JobDetailClient({ job }: JobDetailClientProps) {
             )}
           </div>
         )}
+
+        {/* AI Career Assistant & Tailored Insights (Phase 8) */}
+        <AIMatchAssistant job={job} breakdown={scoreResult ?? undefined} />
 
         {/* Description Section */}
         <div className="space-y-4 text-xs sm:text-sm text-neutral-700 leading-relaxed">

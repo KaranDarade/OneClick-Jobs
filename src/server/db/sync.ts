@@ -2,7 +2,6 @@ import { getJobRepository, IJobRepository } from "./repository";
 import { GreenhouseClient } from "@/server/providers/greenhouse/client";
 import { JobvettaClient } from "@/server/providers/jobvetta/client";
 import { deduplicateJobs } from "@/server/jobs/deduplicate";
-import { Job } from "@/types/job";
 import { SourceSyncRun } from "./schema";
 
 export interface SyncResult {
@@ -29,9 +28,9 @@ export class JobSyncService {
   async syncGreenhouse(): Promise<SyncResult> {
     const start = Date.now();
     try {
-      const jobs = await this.greenhouse.getAllJobs();
-      const deduplicated = deduplicateJobs(jobs);
-      const { inserted, updated } = await this.repo.upsertJobs(deduplicated);
+      const jobs = await this.greenhouse.search();
+      const report = deduplicateJobs(jobs);
+      const { inserted, updated } = await this.repo.upsertJobs(report.uniqueJobs);
       const durationMs = Date.now() - start;
 
       await this.repo.recordSyncRun({
@@ -80,9 +79,9 @@ export class JobSyncService {
   async syncJobvetta(): Promise<SyncResult> {
     const start = Date.now();
     try {
-      const searchResult = await this.jobvetta.searchJobs();
-      const deduplicated = deduplicateJobs(searchResult.jobs);
-      const { inserted, updated } = await this.repo.upsertJobs(deduplicated);
+      const searchResult = await this.jobvetta.search();
+      const report = deduplicateJobs(searchResult.jobs);
+      const { inserted, updated } = await this.repo.upsertJobs(report.uniqueJobs);
       const durationMs = Date.now() - start;
 
       await this.repo.recordSyncRun({

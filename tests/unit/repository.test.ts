@@ -7,21 +7,38 @@ describe("InMemoryJobRepository", () => {
 
   const mockJob: Job = {
     id: "test:001",
+    providerId: "test",
+    externalId: "001",
     title: "Senior Full Stack Engineer",
     company: "Acme India",
-    companySlug: "acme",
-    locationRaw: "Bengaluru, Karnataka",
-    city: "Bengaluru",
+    companyLogoUrl: null,
+    originalUrl: "https://example.com/job/001",
+    sourceAttribution: "Acme Careers",
+    originalLocation: "Bengaluru, Karnataka",
+    normalizedCity: "Bengaluru",
+    normalizedState: "Karnataka",
     country: "India",
-    isRemote: false,
-    workArrangement: "Hybrid",
-    descriptionHtml: "<p>React and Node.js</p>",
-    descriptionText: "React and Node.js developer needed",
-    url: "https://example.com/job/001",
-    source: "test",
-    provider: "greenhouse",
+    workArrangement: "hybrid",
+    remoteEligibility: null,
+    employmentType: "full-time",
+    experienceRange: { minYears: 4, maxYears: 8 },
+    experienceLevel: "senior",
+    requiredSkills: ["React", "Node.js", "TypeScript"],
+    preferredSkills: ["PostgreSQL"],
+    requiredQualifications: [],
+    preferredQualifications: [],
+    description: "React and Node.js developer needed",
+    responsibilities: [],
+    salaryMin: 2000000,
+    salaryMax: 3500000,
+    salaryCurrency: "INR",
+    salaryPeriod: "yearly",
     postedAt: "2026-10-27T10:00:00Z",
-    extractedSkills: ["React", "Node.js", "TypeScript"],
+    firstSeenAt: "2026-10-27T10:00:00Z",
+    lastSeenAt: "2026-10-27T10:00:00Z",
+    lastRefreshedAt: "2026-10-27T10:00:00Z",
+    status: "active",
+    providerMeta: {},
   };
 
   beforeEach(() => {
@@ -53,11 +70,11 @@ describe("InMemoryJobRepository", () => {
         ...mockJob,
         id: "test:002",
         title: "Frontend Developer",
-        city: "Hyderabad",
-        locationRaw: "Hyderabad",
-        isRemote: true,
-        workArrangement: "Remote",
-        extractedSkills: ["React", "CSS"],
+        normalizedCity: "Hyderabad",
+        originalLocation: "Hyderabad",
+        workArrangement: "remote",
+        requiredSkills: ["React", "CSS"],
+        preferredSkills: [],
       },
     ]);
 
@@ -72,7 +89,7 @@ describe("InMemoryJobRepository", () => {
     expect(locRes.jobs[0].id).toBe("test:002");
 
     // Query by work arrangement
-    const remoteRes = await repo.queryJobs({ workArrangement: "Remote" });
+    const remoteRes = await repo.queryJobs({ workArrangement: "remote" });
     expect(remoteRes.total).toBe(1);
     expect(remoteRes.jobs[0].id).toBe("test:002");
 

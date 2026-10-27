@@ -28,7 +28,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const demoJobPages: MetadataRoute.Sitemap = DEMO_JOBS.slice(0, 20).map((job) => ({
     url: `${baseUrl}/jobs/${encodeURIComponent(job.id)}`,
-    lastModified: new Date(job.postedAt),
+    lastModified: job.postedAt ? new Date(job.postedAt) : now,
     changeFrequency: "daily",
     priority: 0.7,
   }));

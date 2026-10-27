@@ -1,21 +1,18 @@
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { getJobById } from "@/features/job-search/search";
-import { DEMO_JOBS } from "@/features/job-search/fixtures";
 import { JobDetailClient } from "@/components/jobs/job-detail-client";
 import { JobvettaClient } from "@/server/providers/jobvetta/client";
 import { GreenhouseClient } from "@/server/providers/greenhouse/client";
 
-export function generateStaticParams() {
-  return DEMO_JOBS.map((job) => ({
-    id: encodeURIComponent(job.id),
-  }));
-}
+export const instant = false;
 
 interface JobDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
+  await connection();
   const resolvedParams = await params;
   const decodedId = decodeURIComponent(resolvedParams.id);
 

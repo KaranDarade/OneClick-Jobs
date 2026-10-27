@@ -17,9 +17,36 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OneClick Jobs — Less Searching. More Getting Hired.",
+  title: {
+    default: "OneClick Jobs — Less Searching. More Getting Hired.",
+    template: "%s | OneClick Jobs",
+  },
   description:
-    "India-focused job discovery and matching platform. Find software engineering, tech support, and data roles across Bengaluru, Mumbai, Pune, Hyderabad, and Delhi NCR.",
+    "India-focused job discovery and matching platform. Find tech roles across Bengaluru, Mumbai, Pune, Hyderabad, and Delhi NCR with instant skill compatibility scoring.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://oneclickjobs.in"),
+  keywords: [
+    "Jobs in India",
+    "Tech Jobs Bengaluru",
+    "Software Engineer Jobs",
+    "Remote Jobs India",
+    "Resume Match Scoring",
+    "OneClick Jobs",
+  ],
+  authors: [{ name: "OneClick Jobs Team" }],
+  openGraph: {
+    title: "OneClick Jobs — Less Searching. More Getting Hired.",
+    description:
+      "Search curated tech jobs across top Indian hubs with instant ATS matching and zero spam.",
+    url: "https://oneclickjobs.in",
+    siteName: "OneClick Jobs",
+    locale: "en_IN",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "OneClick Jobs",
+    description: "Less Searching. More Getting Hired.",
+  },
 };
 
 export default function RootLayout({

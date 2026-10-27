@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Job } from "@/types/job";
 import { formatSalary, formatTimeAgo } from "@/lib/utils";
 import { useSavedJobs } from "@/features/saved-jobs/useSavedJobs";
+import { useCandidateProfile } from "@/features/matching/useCandidateProfile";
 import {
   MapPin,
   Bookmark,
@@ -12,6 +13,9 @@ import {
   CheckCircle2,
   ShieldAlert,
   Sparkles,
+  Check,
+  X,
+  HelpCircle,
 } from "lucide-react";
 
 interface JobDetailClientProps {
@@ -20,8 +24,12 @@ interface JobDetailClientProps {
 
 export function JobDetailClient({ job }: JobDetailClientProps) {
   const { isSaved, toggleSave } = useSavedJobs();
+  const { getJobScore, hasProfile } = useCandidateProfile();
   const saved = isSaved(job.id);
-  const matchScore = Number(job.providerMeta?.matchScore || 0);
+
+  // Compute live deterministic score
+  const scoreResult = hasProfile ? getJobScore(job) : null;
+  const matchScore = scoreResult?.overallScore ?? (Number(job.providerMeta?.matchScore) || 0);
 
   const getCompanyInitial = (name: string) => {
     return name.trim().charAt(0).toUpperCase() || "J";
@@ -124,6 +132,72 @@ export function JobDetailClient({ job }: JobDetailClientProps) {
             <div>
               <strong className="text-neutral-900 font-medium">Demonstration Listing:</strong> This position is a test fixture used for validating search criteria and skill matching. In live production mode, candidates link directly to employer applicant tracking portals.
             </div>
+          </div>
+        )}
+
+        {/* Deterministic Match Compatibility Breakdown (Phase 5) */}
+        {scoreResult && scoreResult.overallScore !== null && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-blue-600" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-blue-900">
+                  Rule-Based Compatibility Breakdown: {scoreResult.overallScore}/100
+                </h2>
+              </div>
+              <span className="text-[10px] font-mono text-neutral-400">
+                {scoreResult.algorithmVersion}
+              </span>
+            </div>
+
+            <p className="text-xs text-neutral-600 leading-relaxed">
+              {scoreResult.summaryText}
+            </p>
+
+            {/* Component Meters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-xs">
+              <div className="rounded-lg bg-white p-2.5 border border-neutral-200 space-y-1">
+                <div className="flex justify-between text-neutral-600">
+                  <span>Required Skills</span>
+                  <span className="font-semibold text-neutral-900">
+                    {scoreResult.components.requiredSkills.score} / {scoreResult.components.requiredSkills.effectiveWeight} pts
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  {scoreResult.components.requiredSkills.explanation}
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-white p-2.5 border border-neutral-200 space-y-1">
+                <div className="flex justify-between text-neutral-600">
+                  <span>Experience Alignment</span>
+                  <span className="font-semibold text-neutral-900">
+                    {scoreResult.components.experience.score} / {scoreResult.components.experience.effectiveWeight} pts
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  {scoreResult.components.experience.explanation}
+                </p>
+              </div>
+            </div>
+
+            {/* Matched vs Missing Skills */}
+            {(scoreResult.matchingRequiredSkills.length > 0 || scoreResult.missingRequiredSkills.length > 0) && (
+              <div className="pt-2 flex flex-wrap gap-2 text-xs">
+                {scoreResult.matchingRequiredSkills.map((s) => (
+                  <span key={s} className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[11px] font-medium">
+                    <Check className="h-3 w-3" />
+                    <span>{s}</span>
+                  </span>
+                ))}
+                {scoreResult.missingRequiredSkills.map((s) => (
+                  <span key={s} className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-[11px] font-medium">
+                    <X className="h-3 w-3" />
+                    <span>{s} (Missing)</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Job } from "@/types/job";
 import { formatSalary, formatTimeAgo } from "@/lib/utils";
 import { useSavedJobs } from "@/features/saved-jobs/useSavedJobs";
+import { useCandidateProfile } from "@/features/matching/useCandidateProfile";
 import {
   MapPin,
   Bookmark,
@@ -17,9 +18,12 @@ interface JobCardProps {
 
 export function JobCard({ job }: JobCardProps) {
   const { isSaved, toggleSave } = useSavedJobs();
+  const { getJobScore, hasProfile } = useCandidateProfile();
   const saved = isSaved(job.id);
 
-  const matchScore = Number(job.providerMeta?.matchScore || 0);
+  // Compute live deterministic compatibility score if candidate profile is present
+  const scoreResult = hasProfile ? getJobScore(job) : null;
+  const matchScore = scoreResult?.overallScore ?? (Number(job.providerMeta?.matchScore) || 0);
 
   // Generate clean initial avatar gradient for company tile
   const getCompanyInitial = (name: string) => {
@@ -51,7 +55,10 @@ export function JobCard({ job }: JobCardProps) {
             {/* Score & Bookmark */}
             <div className="flex items-center gap-1.5 shrink-0">
               {matchScore > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-100">
+                <span
+                  title={scoreResult?.summaryText || `Rule-based compatibility score: ${matchScore}/100`}
+                  className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-100"
+                >
                   <Sparkles className="h-3 w-3 text-blue-600" />
                   <span>{matchScore}%</span>
                 </span>

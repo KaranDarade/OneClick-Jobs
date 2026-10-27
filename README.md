@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OneClick Jobs
 
-## Getting Started
+> **Less Searching. More Getting Hired.**  
+> India-focused modern job discovery and matching platform with zero spam, live ATS integration, instant resume compatibility scoring, and AI-powered career insights.
 
-First, run the development server:
+---
+
+## ✨ Features
+
+- **Live Multi-Source Aggregation**: Direct keyless integration with Greenhouse ATS public boards across top tech employers with India engineering centers (Stripe, MongoDB, Databricks, InMobi, Rubrik, Okta, Elastic, Twilio, Coinbase) alongside Jobvetta and curated demo fixtures.
+- **Privacy-First In-Memory Resume Parsing**: Zero-retention text extraction from PDF resumes using `unpdf`. Files are processed in transient server memory and immediately discarded — never saved to disk or third-party servers.
+- **Deterministic Match Scoring (0–100)**: Rule-based compatibility algorithm (`v1.0.0-rule-based`) evaluating Required Skills (50%), Preferred Skills (20%), Experience Alignment (20%), and Work Arrangement (10%) with transparent scoring breakdowns.
+- **AI Career Assistant**: Google Gemini-powered candidate fit summaries, personalized strength/growth area recommendations, interview talking points, and tailored 1-click copyable cover letter starters (with instant deterministic offline fallback).
+- **Dual-Mode Persistence Layer**: Production-ready Supabase PostgreSQL schema with automatic, zero-crash fallback to high-performance in-memory caching during local development.
+- **Production Ready & Resilient**: Hardened security headers, system health monitoring (`/api/health`), dynamic XML sitemaps, robots.txt, and branded error boundaries.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework**: [Next.js 16.4.3](https://nextjs.org) (App Router, Turbopack, Partial Prerendering)
+- **UI Library**: [React 19](https://react.dev)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com)
+- **Icons**: [Lucide React](https://lucide.dev)
+- **Validation**: [Zod](https://zod.dev)
+- **Resume Processing**: [unpdf](https://github.com/unjs/unpdf)
+- **Testing**: [Vitest](https://vitest.dev) (85/85 tests passing)
+- **Language**: TypeScript Strict Mode
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 20+ installed
+- npm or pnpm
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/KaranDarade/OneClick-Jobs.git
+cd OneClick-Jobs
+
+# Install dependencies
+npm install --legacy-peer-deps
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🧪 Testing & Verification
 
-## Learn More
+Run the comprehensive unit and integration test suite:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Execute unit tests
+npm test
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Run TypeScript typecheck
+npx tsc --noEmit
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Test production build
+npm run build
+```
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## ⚙️ Environment Variables
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Copy `.env.example` to `.env.local` to configure optional integrations. All integrations are optional — OneClick Jobs works out of the box with zero external API keys!
+
+```bash
+# Application Base URL
+NEXT_PUBLIC_APP_URL=https://oneclickjobs.in
+
+# Optional: Jobvetta Provider API Key (50 requests/day)
+JOBVETTA_API_KEY=
+
+# Optional: Supabase PostgreSQL Persistence
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+
+# Optional: Google Gemini AI Assistant
+GEMINI_API_KEY=
+```
+
+---
+
+## ☁️ Deploying to Vercel
+
+1. Import this repository into [Vercel](https://vercel.com).
+2. Vercel automatically detects Next.js and configuration settings from `vercel.json`.
+3. Add any optional environment variables in Project Settings > Environment Variables.
+4. Click **Deploy**.
+
+---
+
+## 📄 License
+
+MIT License. Designed and built with ❤️ for Indian tech job seekers.

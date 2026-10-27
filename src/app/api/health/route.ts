@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getJobRepository } from "@/server/db/repository";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   const startTime = Date.now();
   const repo = getJobRepository();

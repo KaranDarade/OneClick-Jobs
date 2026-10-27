@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { JobvettaClient } from "@/server/providers/jobvetta/client";
+import { GreenhouseClient } from "@/server/providers/greenhouse/client";
 import { getJobById as getDemoJobById } from "@/features/job-search/search";
 
 export async function GET(
@@ -9,7 +10,7 @@ export async function GET(
   const { id } = await context.params;
   const decodedId = decodeURIComponent(id);
 
-  // Check demo jobs first if ID starts with demo:
+  // 1. Check demo jobs if ID starts with demo:
   if (decodedId.startsWith("demo:")) {
     const demoJob = getDemoJobById(decodedId);
     if (!demoJob) {
@@ -18,10 +19,21 @@ export async function GET(
     return NextResponse.json({ job: demoJob, source: "demo" });
   }
 
-  // Handle Jobvetta job lookup
-  const client = new JobvettaClient();
+  // 2. Handle Greenhouse ATS job lookup
+  if (decodedId.startsWith("greenhouse:")) {
+    const externalId = decodedId.replace("greenhouse:", "");
+    const greenhouse = new GreenhouseClient();
+    const job = await greenhouse.getJobById(externalId);
+    if (!job) {
+      return NextResponse.json({ error: "Job not found or no longer active on employer board" }, { status: 404 });
+    }
+    return NextResponse.json({ job, source: "live" });
+  }
+
+  // 3. Handle Jobvetta job lookup
   if (decodedId.startsWith("jobvetta:")) {
     const externalId = decodedId.replace("jobvetta:", "");
+    const client = new JobvettaClient();
     const job = await client.getJobById(externalId);
     if (!job) {
       return NextResponse.json({ error: "Job not found or no longer active" }, { status: 404 });
@@ -29,7 +41,7 @@ export async function GET(
     return NextResponse.json({ job, source: "live" });
   }
 
-  // Direct ID fallback lookup
+  // 4. Direct ID fallback lookup
   const demoFallback = getDemoJobById(decodedId);
   if (demoFallback) {
     return NextResponse.json({ job: demoFallback, source: "demo" });

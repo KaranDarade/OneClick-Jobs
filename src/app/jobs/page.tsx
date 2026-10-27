@@ -125,7 +125,7 @@ function JobsContent() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>Jobvetta Live Feed</span>
+              <span>Live Aggregation (Greenhouse + Jobvetta)</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-700 bg-neutral-100 border border-neutral-200 px-2.5 py-0.5 rounded-full">
@@ -136,7 +136,7 @@ function JobsContent() {
 
           <span className="text-xs text-neutral-500 hidden sm:inline">
             {isLive
-              ? `Live provider active ${apiData?.rateLimitRemaining !== undefined ? `(${apiData.rateLimitRemaining} daily requests remaining)` : ""}`
+              ? `Live feeds active across verified Indian tech boards ${apiData?.rateLimitRemaining !== undefined ? `• ${apiData.rateLimitRemaining} Jobvetta requests left today` : ""}`
               : "Showing curated India tech listings for testing."}
           </span>
         </div>

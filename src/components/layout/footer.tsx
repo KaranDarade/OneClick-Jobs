@@ -8,7 +8,12 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-4">
           {/* Brand Info */}
           <div className="space-y-3 sm:col-span-1">
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2 group">
+              <img
+                src="/icon.svg"
+                alt="OneClick Jobs"
+                className="h-6 w-6 rounded-md shadow-xs group-hover:scale-105 transition-transform"
+              />
               <span className="text-base font-black tracking-tight text-neutral-900">OneClick</span>
               <span className="rounded-md bg-blue-50 px-1 py-0.2 text-[10px] font-bold font-mono uppercase text-blue-600 border border-blue-100">
                 JOBS

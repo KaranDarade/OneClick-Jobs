@@ -27,13 +27,20 @@ export function Navbar() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Row matching JevJobs topbar: bold wordmark + pill badge */}
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2 group">
-            <span className="text-[19px] font-black tracking-tight text-neutral-900 group-hover:text-blue-600 transition-colors">
-              OneClick
-            </span>
-            <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold font-mono uppercase tracking-wider text-blue-600 border border-blue-100">
-              JOBS
-            </span>
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <img
+              src="/icon.svg"
+              alt="OneClick Jobs"
+              className="h-7 w-7 rounded-lg shadow-xs group-hover:scale-105 transition-transform"
+            />
+            <div className="flex items-center gap-1.5">
+              <span className="text-[19px] font-black tracking-tight text-neutral-900 group-hover:text-blue-600 transition-colors">
+                OneClick
+              </span>
+              <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[11px] font-bold font-mono uppercase tracking-wider text-blue-600 border border-blue-100">
+                JOBS
+              </span>
+            </div>
           </Link>
 
           {/* Minimal breadcrumb indicator */}

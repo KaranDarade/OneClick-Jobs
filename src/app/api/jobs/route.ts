@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { JobvettaClient } from "@/server/providers/jobvetta/client";
 import { GreenhouseClient } from "@/server/providers/greenhouse/client";
+import { LeverClient } from "@/server/providers/lever/client";
+import { AshbyClient } from "@/server/providers/ashby/client";
+import { AdzunaClient } from "@/server/providers/adzuna/client";
+import { JoobleClient } from "@/server/providers/jooble/client";
+import { ApifyClient } from "@/server/providers/apify/client";
 import { filterAndSortJobs } from "@/features/job-search/search";
 import { DEMO_JOBS } from "@/features/job-search/fixtures";
 import { deduplicateJobs } from "@/server/jobs/deduplicate";
-import { SearchFilters, SortOption, WorkArrangement, ExperienceLevel, EmploymentType, PostingAge, Job } from "@/types/job";
+import {
+  SearchFilters,
+  SortOption,
+  WorkArrangement,
+  ExperienceLevel,
+  EmploymentType,
+  PostingAge,
+  Job,
+} from "@/types/job";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -39,48 +52,125 @@ export async function GET(request: NextRequest) {
   let jobvettaRemaining: number | undefined = undefined;
   let jobvettaLimit: number | undefined = undefined;
 
-  // 1. Fetch from Greenhouse ATS boards (keyless, 100% free, 350+ live India tech roles)
+  // Initialize all providers
   const greenhouse = new GreenhouseClient();
-  try {
-    const ghJobs = await greenhouse.search({
+  const lever = new LeverClient();
+  const ashby = new AshbyClient();
+  const adzuna = new AdzunaClient();
+  const jooble = new JoobleClient();
+  const apify = new ApifyClient();
+  const jobvetta = new JobvettaClient();
+
+  // Parallel asynchronous fetching with individual provider failure isolation
+  const providerQueries = [
+    // 1. Greenhouse ATS (Keyless)
+    greenhouse.search({
       q: query,
       location: location !== "All India" ? location : undefined,
       days,
-    });
-    if (ghJobs.length > 0) {
-      aggregatedJobs.push(...ghJobs);
+    }),
+    // 2. Lever ATS (Keyless)
+    lever.search({
+      q: query,
+      location: location !== "All India" ? location : undefined,
+      days,
+    }),
+    // 3. Ashby ATS (Keyless)
+    ashby.search({
+      q: query,
+      location: location !== "All India" ? location : undefined,
+      days,
+    }),
+    // 4. Adzuna API (Key-based)
+    adzuna.isConfigured()
+      ? adzuna.search({ q: query, location, page: 1 })
+      : Promise.resolve({ jobs: [] }),
+    // 5. Jooble API (Key-based)
+    jooble.isConfigured()
+      ? jooble.search({ q: query, location, page: 1 })
+      : Promise.resolve({ jobs: [] }),
+    // 6. Apify API (Key-based)
+    apify.isConfigured()
+      ? apify.search({ q: query, location })
+      : Promise.resolve({ jobs: [] }),
+    // 7. Jobvetta API (Key-based)
+    jobvetta.isConfigured()
+      ? jobvetta.search({
+          q: query,
+          location: location !== "All India" ? location : undefined,
+          days: days && days >= 1 && days <= 365 ? days : undefined,
+          limit: 10,
+        })
+      : Promise.resolve({ jobs: [] }),
+  ];
+
+  const results = await Promise.allSettled(providerQueries);
+
+  // Process Greenhouse
+  if (results[0].status === "fulfilled" && Array.isArray(results[0].value)) {
+    if (results[0].value.length > 0) {
+      aggregatedJobs.push(...results[0].value);
       isLive = true;
     }
-  } catch {
-    // Individual provider failure isolation
   }
 
-  // 2. Fetch from Jobvetta if configured
-  const jobvetta = new JobvettaClient();
-  if (jobvetta.isConfigured()) {
-    try {
-      const jvResult = await jobvetta.search({
-        q: query,
-        location: location !== "All India" ? location : undefined,
-        days: days && days >= 1 && days <= 365 ? days : undefined,
-        limit: 10,
-      });
-
-      jobvettaRemaining = jvResult.rateLimitRemaining;
-      jobvettaLimit = jvResult.rateLimitLimit;
-
-      if (jvResult.jobs.length > 0) {
-        aggregatedJobs.push(...jvResult.jobs);
-        isLive = true;
-      } else if (jvResult.error) {
-        providerNotice = jvResult.error;
-      }
-    } catch {
-      // Failure isolation
+  // Process Lever
+  if (results[1].status === "fulfilled" && Array.isArray(results[1].value)) {
+    if (results[1].value.length > 0) {
+      aggregatedJobs.push(...results[1].value);
+      isLive = true;
     }
   }
 
-  // 3. Fallback to Demo Fixtures if no live jobs returned from any provider
+  // Process Ashby
+  if (results[2].status === "fulfilled" && Array.isArray(results[2].value)) {
+    if (results[2].value.length > 0) {
+      aggregatedJobs.push(...results[2].value);
+      isLive = true;
+    }
+  }
+
+  // Process Adzuna
+  if (results[3].status === "fulfilled" && results[3].value && "jobs" in results[3].value) {
+    const r = results[3].value;
+    if (r.jobs && r.jobs.length > 0) {
+      aggregatedJobs.push(...r.jobs);
+      isLive = true;
+    }
+  }
+
+  // Process Jooble
+  if (results[4].status === "fulfilled" && results[4].value && "jobs" in results[4].value) {
+    const r = results[4].value;
+    if (r.jobs && r.jobs.length > 0) {
+      aggregatedJobs.push(...r.jobs);
+      isLive = true;
+    }
+  }
+
+  // Process Apify
+  if (results[5].status === "fulfilled" && results[5].value && "jobs" in results[5].value) {
+    const r = results[5].value;
+    if (r.jobs && r.jobs.length > 0) {
+      aggregatedJobs.push(...r.jobs);
+      isLive = true;
+    }
+  }
+
+  // Process Jobvetta
+  if (results[6].status === "fulfilled" && results[6].value && "jobs" in results[6].value) {
+    const r = results[6].value as any;
+    jobvettaRemaining = r.rateLimitRemaining;
+    jobvettaLimit = r.rateLimitLimit;
+    if (r.jobs && r.jobs.length > 0) {
+      aggregatedJobs.push(...r.jobs);
+      isLive = true;
+    } else if (r.error) {
+      providerNotice = r.error;
+    }
+  }
+
+  // Fallback to Demo Fixtures if no live jobs returned from any provider
   if (aggregatedJobs.length === 0) {
     const demoFiltered = filterAndSortJobs(filters, DEMO_JOBS);
     return NextResponse.json({
@@ -97,10 +187,10 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // 4. Run cross-provider 3-tier canonical deduplication
+  // Cross-provider 3-tier canonical deduplication
   const deduped = deduplicateJobs(aggregatedJobs);
 
-  // 5. Apply user filters & sorting
+  // Apply user filters & sorting
   const finalResult = filterAndSortJobs(filters, deduped.uniqueJobs);
 
   return NextResponse.json({

@@ -17,6 +17,12 @@ export const VETTED_GREENHOUSE_COMPANIES = [
   { slug: "elastic", name: "Elastic" },
   { slug: "twilio", name: "Twilio" },
   { slug: "coinbase", name: "Coinbase" },
+  { slug: "groww", name: "Groww" },
+  { slug: "datadog", name: "Datadog" },
+  { slug: "airbnb", name: "Airbnb" },
+  { slug: "figma", name: "Figma" },
+  { slug: "smartsheet", name: "Smartsheet" },
+  { slug: "workato", name: "Workato" },
 ] as const;
 
 export type GreenhouseCompanySlug = (typeof VETTED_GREENHOUSE_COMPANIES)[number]["slug"];

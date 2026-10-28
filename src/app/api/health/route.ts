@@ -22,13 +22,43 @@ export async function GET() {
         status: "up",
         type: repo.constructor.name,
       },
+      greenhouse: {
+        status: "live",
+        mode: "public_boards",
+      },
+      lever: {
+        status: "live",
+        mode: "public_postings",
+      },
+      ashby: {
+        status: "live",
+        mode: "public_boards",
+      },
       jobvetta: {
         status: process.env.JOBVETTA_API_KEY ? "live" : "demo_fallback",
         apiKeyConfigured: Boolean(process.env.JOBVETTA_API_KEY),
       },
-      greenhouse: {
-        status: "live",
-        mode: "public_boards",
+      adzuna: {
+        status:
+          process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY
+            ? "live"
+            : "demo_fallback",
+        configured: Boolean(
+          process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY
+        ),
+      },
+      jooble: {
+        status: process.env.JOOBLE_API_KEY ? "live" : "demo_fallback",
+        configured: Boolean(process.env.JOOBLE_API_KEY),
+      },
+      apify: {
+        status:
+          process.env.APIFY_API_TOKEN && process.env.APIFY_DEFAULT_DATASET_ID
+            ? "live"
+            : "demo_fallback",
+        configured: Boolean(
+          process.env.APIFY_API_TOKEN && process.env.APIFY_DEFAULT_DATASET_ID
+        ),
       },
     },
   };

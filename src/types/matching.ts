@@ -1,4 +1,10 @@
-import { WorkArrangement } from "@/types/job";
+import { WorkArrangement, RoleCategory } from "@/types/job";
+
+export interface CandidateProject {
+  title: string;
+  description?: string;
+  technologies: string[];
+}
 
 export interface CandidateProfile {
   id: string;
@@ -6,6 +12,10 @@ export interface CandidateProfile {
   userSkills: string[]; // Allows user additions/removals
   experienceYears: number | null;
   experienceLevelHint: string | null;
+  detectedRoleCategory?: RoleCategory | null;
+  secondaryRoleCategories?: RoleCategory[];
+  projects?: CandidateProject[];
+  educationHint?: string | null;
   preferredArrangements: WorkArrangement[];
   parsedAt: string;
   parsingWarnings: string[];

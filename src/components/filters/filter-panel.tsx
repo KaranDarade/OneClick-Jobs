@@ -6,6 +6,7 @@ import {
   ExperienceLevel,
   EmploymentType,
   PostingAge,
+  RoleCategory,
 } from "@/types/job";
 import { POPULAR_INDIAN_CITIES } from "@/features/job-search/fixtures";
 import { RotateCcw } from "lucide-react";
@@ -62,9 +63,18 @@ export function FilterPanel({
     });
   };
 
+  const handleRoleCategoryToggle = (role: RoleCategory) => {
+    const current = filters.roleCategories || [];
+    onFilterChange({
+      ...filters,
+      roleCategories: toggleArrayItem(current, role),
+    });
+  };
+
   const isFiltered =
     filters.query !== "" ||
     filters.location !== "All India" ||
+    (filters.roleCategories && filters.roleCategories.length > 0) ||
     filters.workArrangements.length > 0 ||
     filters.experienceLevels.length > 0 ||
     filters.employmentTypes.length > 0 ||
@@ -106,6 +116,43 @@ export function FilterPanel({
           ))}
           <option value="Delhi NCR">Delhi NCR</option>
         </select>
+      </div>
+
+      {/* Role / Tech Domain Filter */}
+      <div className="space-y-2">
+        <span className="text-xs font-semibold text-neutral-700">
+          Tech Discipline
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              "Frontend",
+              "Backend",
+              "Full Stack",
+              "Mobile",
+              "DevOps & Cloud",
+              "Data & AI",
+              "QA & Testing",
+              "Product & Design",
+            ] as RoleCategory[]
+          ).map((role) => {
+            const isSelected = (filters.roleCategories || []).includes(role);
+            return (
+              <button
+                key={role}
+                type="button"
+                onClick={() => handleRoleCategoryToggle(role)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                  isSelected
+                    ? "bg-blue-600 text-white font-semibold"
+                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                }`}
+              >
+                {role}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Work Arrangement (JevJobs Pill Filters) */}

@@ -9,6 +9,7 @@ import { AshbyClient } from "@/server/providers/ashby/client";
 import { AdzunaClient } from "@/server/providers/adzuna/client";
 import { JoobleClient } from "@/server/providers/jooble/client";
 import { ApifyClient } from "@/server/providers/apify/client";
+import { RemoteOkClient } from "@/server/providers/remoteok/client";
 
 export const instant = false;
 
@@ -72,7 +73,15 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
     if (liveJob) job = liveJob;
   }
 
-  // 8. Jobvetta job
+  // 8. RemoteOK job
+  if (!job && decodedId.startsWith("remoteok:")) {
+    const externalId = decodedId.replace("remoteok:", "");
+    const remoteok = new RemoteOkClient();
+    const liveJob = await remoteok.getJobById(externalId);
+    if (liveJob) job = liveJob;
+  }
+
+  // 9. Jobvetta job
   if (!job && decodedId.startsWith("jobvetta:")) {
     const externalId = decodedId.replace("jobvetta:", "");
     const client = new JobvettaClient();

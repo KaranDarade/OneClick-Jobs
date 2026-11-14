@@ -82,6 +82,10 @@ export async function POST(request: NextRequest) {
         userSkills: skillResult.detectedSkills, // Defaults to extracted skills
         experienceYears: skillResult.experienceYears,
         experienceLevelHint: skillResult.experienceLevelHint,
+        detectedRoleCategory: skillResult.detectedRoleCategory,
+        secondaryRoleCategories: skillResult.secondaryRoleCategories,
+        projects: skillResult.projects,
+        educationHint: skillResult.educationHint,
         preferredArrangements: ["remote", "hybrid"], // Default sensible preference
         parsedAt: new Date().toISOString(),
         parsingWarnings: combinedWarnings,

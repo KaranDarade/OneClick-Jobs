@@ -6,6 +6,7 @@ import { AshbyClient } from "@/server/providers/ashby/client";
 import { AdzunaClient } from "@/server/providers/adzuna/client";
 import { JoobleClient } from "@/server/providers/jooble/client";
 import { ApifyClient } from "@/server/providers/apify/client";
+import { RemoteOkClient } from "@/server/providers/remoteok/client";
 import { filterAndSortJobs } from "@/features/job-search/search";
 import { DEMO_JOBS } from "@/features/job-search/fixtures";
 import { deduplicateJobs } from "@/server/jobs/deduplicate";
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
   const adzuna = new AdzunaClient();
   const jooble = new JoobleClient();
   const apify = new ApifyClient();
+  const remoteok = new RemoteOkClient();
   const jobvetta = new JobvettaClient();
 
   // Parallel asynchronous fetching with individual provider failure isolation
@@ -81,19 +83,21 @@ export async function GET(request: NextRequest) {
       location: location !== "All India" ? location : undefined,
       days,
     }),
-    // 4. Adzuna API (Key-based)
+    // 4. RemoteOK (100% Free Public Feed)
+    remoteok.getJobs(25),
+    // 5. Adzuna API (Key-based)
     adzuna.isConfigured()
       ? adzuna.search({ q: query, location, page: 1 })
       : Promise.resolve({ jobs: [] }),
-    // 5. Jooble API (Key-based)
+    // 6. Jooble API (Key-based)
     jooble.isConfigured()
       ? jooble.search({ q: query, location, page: 1 })
       : Promise.resolve({ jobs: [] }),
-    // 6. Apify API (Key-based)
+    // 7. Apify API (Key-based)
     apify.isConfigured()
       ? apify.search({ q: query, location })
       : Promise.resolve({ jobs: [] }),
-    // 7. Jobvetta API (Key-based)
+    // 8. Jobvetta API (Key-based)
     jobvetta.isConfigured()
       ? jobvetta.search({
           q: query,
@@ -130,16 +134,15 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Process Adzuna
-  if (results[3].status === "fulfilled" && results[3].value && "jobs" in results[3].value) {
-    const r = results[3].value;
-    if (r.jobs && r.jobs.length > 0) {
-      aggregatedJobs.push(...r.jobs);
+  // Process RemoteOK
+  if (results[3].status === "fulfilled" && Array.isArray(results[3].value)) {
+    if (results[3].value.length > 0) {
+      aggregatedJobs.push(...results[3].value);
       isLive = true;
     }
   }
 
-  // Process Jooble
+  // Process Adzuna
   if (results[4].status === "fulfilled" && results[4].value && "jobs" in results[4].value) {
     const r = results[4].value;
     if (r.jobs && r.jobs.length > 0) {
@@ -148,7 +151,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Process Apify
+  // Process Jooble
   if (results[5].status === "fulfilled" && results[5].value && "jobs" in results[5].value) {
     const r = results[5].value;
     if (r.jobs && r.jobs.length > 0) {
@@ -157,9 +160,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Process Jobvetta
+  // Process Apify
   if (results[6].status === "fulfilled" && results[6].value && "jobs" in results[6].value) {
-    const r = results[6].value as any;
+    const r = results[6].value;
+    if (r.jobs && r.jobs.length > 0) {
+      aggregatedJobs.push(...r.jobs);
+      isLive = true;
+    }
+  }
+
+  // Process Jobvetta
+  if (results[7].status === "fulfilled" && results[7].value && "jobs" in results[7].value) {
+    const r = results[7].value as any;
     jobvettaRemaining = r.rateLimitRemaining;
     jobvettaLimit = r.rateLimitLimit;
     if (r.jobs && r.jobs.length > 0) {

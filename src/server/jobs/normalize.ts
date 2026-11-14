@@ -1,7 +1,53 @@
 import { z } from "zod";
-import { Job, WorkArrangement, ExperienceLevel, EmploymentType, SalaryPeriod, JobStatus } from "@/types/job";
+import { Job, WorkArrangement, ExperienceLevel, EmploymentType, SalaryPeriod, JobStatus, RoleCategory } from "@/types/job";
 import { normalizeIndianLocation } from "./locations";
 import { normalizeSkillList } from "./skills";
+
+/**
+ * Infers the high-level role category from title and skills
+ */
+export function inferRoleCategory(title: string, skills: string[] = []): RoleCategory {
+  const lowerTitle = title.toLowerCase();
+  const lowerSkills = skills.map(s => s.toLowerCase());
+
+  if (/\b(frontend|front-end|ui developer|web developer|react|vue|angular|css|next\.js)\b/i.test(lowerTitle)) {
+    return "Frontend";
+  }
+  if (/\b(backend|back-end|api|node|python|java|golang|rust|ruby|server|c#|c\+\+|spring|django)\b/i.test(lowerTitle)) {
+    return "Backend";
+  }
+  if (/\b(fullstack|full-stack|full stack)\b/i.test(lowerTitle)) {
+    return "Full Stack";
+  }
+  if (/\b(android|ios|mobile|flutter|react native|swift|kotlin)\b/i.test(lowerTitle)) {
+    return "Mobile";
+  }
+  if (/\b(devops|sre|cloud|infrastructure|platform|kubernetes|docker|terraform|aws)\b/i.test(lowerTitle)) {
+    return "DevOps & Cloud";
+  }
+  if (/\b(data engineer|data scientist|machine learning|ml|ai|deep learning|analytics|nlp|cv)\b/i.test(lowerTitle)) {
+    return "Data & AI";
+  }
+  if (/\b(qa|quality assurance|testing|test|automation engineer|sdet)\b/i.test(lowerTitle)) {
+    return "QA & Testing";
+  }
+  if (/\b(product manager|product owner|ui\/ux|ux designer|product designer)\b/i.test(lowerTitle)) {
+    return "Product & Design";
+  }
+
+  // Fallback to skill cluster inspection
+  if (lowerSkills.some(s => ["react", "next.js", "vue.js", "angular", "html/css", "tailwind css"].includes(s))) {
+    return "Frontend";
+  }
+  if (lowerSkills.some(s => ["node.js", "python", "java", "golang", "postgresql", "mongodb", "redis"].includes(s))) {
+    return "Backend";
+  }
+  if (lowerSkills.some(s => ["docker", "kubernetes", "aws", "terraform", "ci/cd"].includes(s))) {
+    return "DevOps & Cloud";
+  }
+
+  return "General Tech";
+}
 
 /**
  * Raw input schema for validating unstructured or external provider payloads.
@@ -88,33 +134,75 @@ export function normalizeWorkArrangement(raw?: string | null): WorkArrangement {
 }
 
 /**
- * Normalizes experience level strings and numerical hints.
+ * Normalizes experience level strings, title keywords, and numerical hints.
  */
 export function normalizeExperienceLevel(
   rawLevel?: string | null,
   minYears?: number | null,
-  maxYears?: number | null
+  maxYears?: number | null,
+  title?: string | null,
+  description?: string | null
 ): ExperienceLevel {
-  const lower = (rawLevel || "").trim().toLowerCase();
+  const combinedText = `${rawLevel || ""} ${title || ""} ${description ? description.slice(0, 1000) : ""}`.toLowerCase();
 
-  if (lower.includes("intern")) return "internship";
-  if (lower.includes("fresher") || lower.includes("entry") || lower.includes("trainee") || lower.includes("graduate")) {
+  // 1. Highest specificity: Internship
+  if (
+    /\b(intern|internship|co-op|coop|apprentice|apprenticeship|summer intern|winter intern)\b/i.test(combinedText)
+  ) {
+    return "internship";
+  }
+
+  // 2. Fresher / Entry Level / Graduate
+  if (
+    /\b(fresher|entry level|entry-level|entry|trainee|graduate|campus|new grad|college graduate|junior associate|specialist 1|specialist i|engineer 1|engineer i|developer 1|developer i|associate 1|associate i)\b/i.test(combinedText) ||
+    /\b0\s*-\s*1\s*(?:year|yr)|0\s*-\s*2\s*(?:years|yrs)\b/i.test(combinedText) ||
+    /freshers?\s+(can|are\s+welcome\s+to)\s+apply/i.test(combinedText)
+  ) {
     return "fresher";
   }
-  if (lower.includes("junior") || lower.includes("associate")) return "junior";
-  if (lower.includes("lead") || lower.includes("principal") || lower.includes("architect") || lower.includes("director") || lower.includes("staff")) {
+
+  // 3. Lead / Principal / Director / Staff / Architect / Head / VP / Engineering Manager
+  if (
+    /\b(principal|architect|director|vp|vice president|head of|cluster head|staff engineer|staff software|engineering manager|tech lead|team lead|technical lead)\b/i.test(combinedText)
+  ) {
     return "lead";
   }
-  if (lower.includes("senior") || lower.includes("sr.")) return "senior";
-  if (lower.includes("mid")) return "mid";
 
-  // Infer from year ranges if provided
+  // 4. Senior Level
+  if (
+    /\b(senior|sr\.|sr\s|iii|iv|level 3|level 4|senior engineer|senior developer|sr software|account executive enterprise|senior manager|sr manager)\b/i.test(combinedText)
+  ) {
+    return "senior";
+  }
+
+  // 5. Junior / Associate Level
+  if (
+    /\b(junior|jr\.|jr\s|associate|coordinator|sourcer|assistant|tele caller|customer support|support specialist)\b/i.test(combinedText)
+  ) {
+    return "junior";
+  }
+
+  // 6. Mid Level (General Managers, Product Managers, Engineers, Developers, Specialists)
+  if (
+    /\b(mid|intermediate|level 2|ii|2|sde 2|sde ii|engineer ii|developer ii|software engineer|developer|engineer|analyst|designer|accountant|counsel|executive|specialist|expert|manager|lead|management)\b/i.test(combinedText)
+  ) {
+    return "mid";
+  }
+
+  // 7. Infer from explicit year ranges if provided
   if (typeof minYears === "number") {
     if (minYears === 0 && (maxYears === 0 || maxYears === 1)) return "fresher";
     if (minYears >= 8) return "lead";
     if (minYears >= 5) return "senior";
     if (minYears >= 3) return "mid";
     if (minYears >= 1) return "junior";
+  }
+
+  // 8. If title contains standard tech roles without senior/lead prefixes, default sensibly to "mid"
+  if (
+    /\b(software engineer|developer|programmer|analyst|designer|consultant|qa engineer)\b/i.test(combinedText)
+  ) {
+    return "mid";
   }
 
   return "unknown";
@@ -176,7 +264,9 @@ export function normalizeJob(rawInput: unknown): NormalizationResult {
   const experienceLevel = normalizeExperienceLevel(
     raw.experienceLevel,
     raw.experienceYearsMin,
-    raw.experienceYearsMax
+    raw.experienceYearsMax,
+    raw.title,
+    raw.description
   );
 
   // Employment type
@@ -244,6 +334,7 @@ export function normalizeJob(rawInput: unknown): NormalizationResult {
     status: (raw.status as JobStatus) || "active",
     providerMeta: raw.providerMeta || {},
     isDemo: raw.isDemo ?? false,
+    roleCategory: inferRoleCategory(raw.title, requiredSkills),
   };
 
   return {

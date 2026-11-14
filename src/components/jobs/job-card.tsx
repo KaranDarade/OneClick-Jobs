@@ -107,30 +107,44 @@ export function JobCard({ job }: JobCardProps) {
             )}
           </div>
 
-          {/* Skill Tag Pills */}
-          {job.requiredSkills && job.requiredSkills.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              {job.requiredSkills.slice(0, 4).map((skill) => (
-                <span
-                  key={skill}
-                  className="rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600"
-                >
-                  {skill}
-                </span>
-              ))}
-              {job.requiredSkills.length > 4 && (
-                <span className="text-[10px] text-neutral-400 font-medium">
-                  +{job.requiredSkills.length - 4} more
-                </span>
-              )}
+          {/* Skill Tag & Action Row */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            {job.requiredSkills && job.requiredSkills.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {job.requiredSkills.slice(0, 4).map((skill) => (
+                  <span
+                    key={skill}
+                    className="rounded-md bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-600"
+                  >
+                    {skill}
+                  </span>
+                ))}
+                {job.requiredSkills.length > 4 && (
+                  <span className="text-[10px] text-neutral-400 font-medium">
+                    +{job.requiredSkills.length - 4} more
+                  </span>
+                )}
 
-              {job.isDemo && (
-                <span className="ml-auto rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-mono text-neutral-500">
-                  DEMO
-                </span>
-              )}
-            </div>
-          )}
+                {job.isDemo && (
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-mono text-neutral-500">
+                    DEMO
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Direct Apply Button */}
+            <a
+              href={job.originalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 transition-colors"
+              title={`Apply directly on ${job.sourceAttribution || job.company}`}
+            >
+              <span>Apply Link</span>
+              <ArrowUpRight className="h-3 w-3" />
+            </a>
+          </div>
         </div>
       </div>
     </div>

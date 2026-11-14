@@ -35,7 +35,19 @@ export interface Job {
   status: JobStatus;
   providerMeta: Record<string, unknown>;
   isDemo?: boolean;
+  roleCategory?: RoleCategory;
 }
+
+export type RoleCategory =
+  | 'Frontend'
+  | 'Backend'
+  | 'Full Stack'
+  | 'Mobile'
+  | 'DevOps & Cloud'
+  | 'Data & AI'
+  | 'QA & Testing'
+  | 'Product & Design'
+  | 'General Tech';
 
 export type WorkArrangement = 'on-site' | 'hybrid' | 'remote' | 'unknown';
 
@@ -71,6 +83,7 @@ export interface SearchFilters {
   workArrangements: WorkArrangement[];
   experienceLevels: ExperienceLevel[];
   employmentTypes: EmploymentType[];
+  roleCategories?: RoleCategory[];
   postingAge: PostingAge | null;
   sortBy: SortOption;
 }

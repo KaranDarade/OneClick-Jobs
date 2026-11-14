@@ -1,10 +1,211 @@
 import { TECHNICAL_SKILL_MAPPINGS, normalizeSkillList } from "@/server/jobs/skills";
+import { RoleCategory } from "@/types/job";
+import { CandidateProject } from "@/types/matching";
 
 export interface SkillExtractionResult {
   detectedSkills: string[];
   experienceYears: number | null;
   experienceLevelHint: string | null;
+  detectedRoleCategory: RoleCategory;
+  secondaryRoleCategories: RoleCategory[];
+  projects: CandidateProject[];
+  educationHint: string | null;
   warnings: string[];
+}
+
+/**
+ * Extracts candidate academic and industry projects from resume text
+ */
+export function extractProjectsFromResume(text: string, detectedSkills: string[]): CandidateProject[] {
+  const projects: CandidateProject[] = [];
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  // Identify Projects Section boundary
+  let inProjectsSection = false;
+  let currentProject: CandidateProject | null = null;
+
+  const sectionHeaderRegex = /^(?:key\s+)?(?:academic\s+|personal\s+|technical\s+)?projects?(?:\s*&?\s*initiatives)?(?:\s*:|$)/i;
+  const nextSectionHeaderRegex = /^(?:work\s+experience|employment|experience|education|skills|certifications|achievements|publications|interests|languages)(?:\s*:|$)/i;
+
+  for (const line of lines) {
+    if (sectionHeaderRegex.test(line)) {
+      inProjectsSection = true;
+      continue;
+    }
+
+    if (inProjectsSection && nextSectionHeaderRegex.test(line)) {
+      inProjectsSection = false;
+      if (currentProject) {
+        projects.push(currentProject);
+        currentProject = null;
+      }
+      break;
+    }
+
+    if (inProjectsSection) {
+      // Check if line looks like a project title (e.g. bold or bullet point or title with colon/parenthesis)
+      const projectTitleMatch = line.match(/^[-•*#]?\s*([A-Za-z0-9\s-_]{3,45})(?:\s*[-–|:]|\s*\(([^)]+)\)|$)/);
+      
+      if (projectTitleMatch && projectTitleMatch[1] && !line.toLowerCase().startsWith("used") && !line.toLowerCase().startsWith("built") && !line.toLowerCase().startsWith("developed")) {
+        if (currentProject) {
+          projects.push(currentProject);
+        }
+
+        const rawTitle = projectTitleMatch[1].trim();
+        const techHint = projectTitleMatch[2] || "";
+        
+        // Find matching skills in the line
+        const matchedTech = detectedSkills.filter(s => 
+          line.toLowerCase().includes(s.toLowerCase()) || techHint.toLowerCase().includes(s.toLowerCase())
+        );
+
+        currentProject = {
+          title: rawTitle,
+          description: line,
+          technologies: matchedTech,
+        };
+      } else if (currentProject) {
+        // Append description line
+        currentProject.description = `${currentProject.description} ${line}`.slice(0, 300);
+        
+        // Check for technologies mentioned in description line
+        for (const skill of detectedSkills) {
+          if (!currentProject.technologies.includes(skill) && line.toLowerCase().includes(skill.toLowerCase())) {
+            currentProject.technologies.push(skill);
+          }
+        }
+      }
+    }
+  }
+
+  if (currentProject) {
+    projects.push(currentProject);
+  }
+
+  return projects.slice(0, 5); // Return top 5 detected projects
+}
+
+/**
+ * Extracts education details from resume text
+ */
+export function extractEducationFromResume(text: string): string | null {
+  const eduMatch = text.match(/\b(b\.?tech|b\.?e|m\.?tech|m\.?s|bca|mca|b\.?sc|m\.?sc|phd|bachelor(?:'s)?|master(?:'s)?)(?:\s+(?:in|of)\s+([A-Za-z\s&]{3,35}))?/i);
+  if (eduMatch) {
+    const degree = eduMatch[1].toUpperCase();
+    const branch = eduMatch[2] ? `in ${eduMatch[2].trim()}` : "";
+    return `${degree} ${branch}`.trim();
+  }
+  return null;
+}
+
+/**
+ * Domain clusters used for deterministic role categorization
+ */
+const DOMAIN_SKILL_CLUSTERS: Record<RoleCategory, string[]> = {
+  Frontend: [
+    "React", "Next.js", "Vue.js", "Angular", "HTML/CSS", "Tailwind CSS",
+    "JavaScript", "TypeScript", "Redux", "Svelte", "Webpack", "Vite"
+  ],
+  Backend: [
+    "Node.js", "Python", "Java", "Golang", "Rust", "C#", "C++", "Ruby",
+    "PostgreSQL", "MongoDB", "Redis", "MySQL", "Express", "NestJS", "FastAPI",
+    "Django", "Spring Boot", "GraphQL", "REST", "Microservices", "Kafka", "RabbitMQ"
+  ],
+  "Full Stack": [
+    // Evaluated dynamically if candidate has strong Frontend AND Backend skills
+  ],
+  Mobile: [
+    "React Native", "Flutter", "Android", "iOS", "Swift", "Kotlin"
+  ],
+  "DevOps & Cloud": [
+    "AWS", "Docker", "Kubernetes", "GCP", "Azure", "Terraform", "CI/CD",
+    "Linux", "Ansible", "Prometheus", "Grafana", "Helm"
+  ],
+  "Data & AI": [
+    "Python", "SQL", "Machine Learning", "Deep Learning", "PyTorch",
+    "TensorFlow", "Pandas", "NumPy", "Data Science", "Computer Vision",
+    "NLP", "Big Data", "Spark", "Hadoop"
+  ],
+  "QA & Testing": [
+    "Selenium", "Cypress", "Jest", "Playwright", "Automation Testing", "JUnit", "QA"
+  ],
+  "Product & Design": [
+    "Figma", "UI/UX", "Product Management", "System Design", "Agile", "Scrum"
+  ],
+  "General Tech": []
+};
+
+/**
+ * Classifies candidate skills into primary and secondary role categories
+ */
+export function classifyRoleCategory(skills: string[], text = ""): {
+  primary: RoleCategory;
+  secondary: RoleCategory[];
+} {
+  const lowerText = text.toLowerCase();
+  const skillSet = new Set(skills.map(s => s.toLowerCase()));
+
+  // Count matches in each domain
+  const scores: Partial<Record<RoleCategory, number>> = {};
+
+  for (const [cat, cluster] of Object.entries(DOMAIN_SKILL_CLUSTERS) as [RoleCategory, string[]][]) {
+    if (cat === "Full Stack" || cat === "General Tech") continue;
+    let count = 0;
+    for (const skill of cluster) {
+      if (skillSet.has(skill.toLowerCase())) {
+        count += 2; // Skill match is high signal
+      }
+    }
+    // Also check text keyword mentions
+    if (lowerText.includes(cat.toLowerCase())) {
+      count += 3;
+    }
+    scores[cat] = count;
+  }
+
+  // Explicit title indicators in resume text
+  if (/\b(frontend|front-end|ui developer|web developer)\b/i.test(lowerText)) {
+    scores.Frontend = (scores.Frontend || 0) + 5;
+  }
+  if (/\b(backend|back-end|api developer|server engineer)\b/i.test(lowerText)) {
+    scores.Backend = (scores.Backend || 0) + 5;
+  }
+  if (/\b(fullstack|full-stack|full stack)\b/i.test(lowerText)) {
+    scores["Full Stack"] = (scores["Full Stack"] || 0) + 7;
+  }
+  if (/\b(android|ios|mobile developer|flutter developer)\b/i.test(lowerText)) {
+    scores.Mobile = (scores.Mobile || 0) + 6;
+  }
+  if (/\b(devops|sre|cloud engineer|platform engineer|infrastructure)\b/i.test(lowerText)) {
+    scores["DevOps & Cloud"] = (scores["DevOps & Cloud"] || 0) + 6;
+  }
+  if (/\b(data scientist|data engineer|machine learning|ml engineer|ai engineer)\b/i.test(lowerText)) {
+    scores["Data & AI"] = (scores["Data & AI"] || 0) + 6;
+  }
+  if (/\b(qa engineer|quality assurance|software tester|automation engineer)\b/i.test(lowerText)) {
+    scores["QA & Testing"] = (scores["QA & Testing"] || 0) + 6;
+  }
+
+  // If candidate has significant frontend AND backend skills, classify as Full Stack
+  const frontendScore = scores.Frontend || 0;
+  const backendScore = scores.Backend || 0;
+  if ((frontendScore >= 4 && backendScore >= 4) || (scores["Full Stack"] || 0) > 0) {
+    scores["Full Stack"] = Math.max(scores["Full Stack"] || 0, frontendScore + backendScore);
+  }
+
+  // Sort domains by highest score
+  const sortedCategories = (Object.entries(scores) as [RoleCategory, number][])
+    .filter(([_, score]) => score > 0)
+    .sort((a, b) => b[1] - a[1]);
+
+  if (sortedCategories.length === 0) {
+    return { primary: "General Tech", secondary: [] };
+  }
+
+  const primary = sortedCategories[0][0];
+  const secondary = sortedCategories.slice(1, 3).map(([cat]) => cat);
+
+  return { primary, secondary };
 }
 
 /**
@@ -94,6 +295,10 @@ export function extractSkillsFromResume(text: string): SkillExtractionResult {
       detectedSkills: [],
       experienceYears: null,
       experienceLevelHint: null,
+      detectedRoleCategory: "General Tech",
+      secondaryRoleCategories: [],
+      projects: [],
+      educationHint: null,
       warnings: ["Empty text provided for skill extraction."],
     };
   }
@@ -146,10 +351,21 @@ export function extractSkillsFromResume(text: string): SkillExtractionResult {
     warnings.push("No known technical skills from our taxonomy were detected in the text.");
   }
 
+  // 3. Classify primary and secondary role categories
+  const { primary: detectedRoleCategory, secondary: secondaryRoleCategories } = classifyRoleCategory(finalSkills, text);
+
+  // 4. Extract projects and education
+  const projects = extractProjectsFromResume(text, finalSkills);
+  const educationHint = extractEducationFromResume(text);
+
   return {
     detectedSkills: finalSkills,
     experienceYears,
     experienceLevelHint,
+    detectedRoleCategory,
+    secondaryRoleCategories,
+    projects,
+    educationHint,
     warnings,
   };
 }

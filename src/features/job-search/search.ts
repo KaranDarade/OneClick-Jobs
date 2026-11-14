@@ -2,6 +2,7 @@ import { Job, SearchFilters, SearchResult } from "@/types/job";
 import { DEMO_JOBS } from "./fixtures";
 import { matchesLocationFilter } from "@/server/jobs/locations";
 import { normalizeSkillName } from "@/server/jobs/skills";
+import { inferRoleCategory } from "@/server/jobs/normalize";
 
 /**
  * Filter, search and sort jobs against an arbitrary dataset or default demo jobs.
@@ -18,6 +19,14 @@ export function filterAndSortJobs(
   const normalizedQuerySkill = query ? normalizeSkillName(query).toLowerCase() : "";
 
   const filtered = dataset.filter((job) => {
+    // 0. Role Category Filter (e.g. from resume auto-curation)
+    if (filters.roleCategories && filters.roleCategories.length > 0) {
+      const category = job.roleCategory || inferRoleCategory(job.title, job.requiredSkills);
+      if (!filters.roleCategories.includes(category)) {
+        return false;
+      }
+    }
+
     // 1. Text Search (title, company, requiredSkills, description)
     if (query) {
       const matchTitle = job.title.toLowerCase().includes(query);

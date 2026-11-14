@@ -34,6 +34,10 @@ export async function GET() {
         status: "live",
         mode: "public_boards",
       },
+      remoteok: {
+        status: "live",
+        mode: "public_feed",
+      },
       jobvetta: {
         status: process.env.JOBVETTA_API_KEY ? "live" : "demo_fallback",
         apiKeyConfigured: Boolean(process.env.JOBVETTA_API_KEY),

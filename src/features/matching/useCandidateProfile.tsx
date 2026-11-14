@@ -14,6 +14,8 @@ interface CandidateProfileContextType {
   setPreferredArrangements: (arrangements: ("remote" | "hybrid" | "on-site")[]) => void;
   getJobScore: (job: Job) => CompatibilityScoreResult | null;
   hasProfile: boolean;
+  isAutoMatchActive: boolean;
+  setIsAutoMatchActive: (active: boolean) => void;
 }
 
 const STORAGE_KEY = "oneclick_candidate_profile_v1";
@@ -23,6 +25,7 @@ const CandidateProfileContext = createContext<CandidateProfileContextType | unde
 export function CandidateProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<CandidateProfile | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isAutoMatchActive, setIsAutoMatchActive] = useState<boolean>(true);
 
   // Load from sessionStorage on mount (session-only, transient)
   useEffect(() => {
@@ -107,6 +110,8 @@ export function CandidateProfileProvider({ children }: { children: ReactNode }) 
         setPreferredArrangements,
         getJobScore,
         hasProfile: Boolean(profile),
+        isAutoMatchActive,
+        setIsAutoMatchActive,
       }}
     >
       {children}

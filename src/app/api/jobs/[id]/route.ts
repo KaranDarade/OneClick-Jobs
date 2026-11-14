@@ -6,6 +6,7 @@ import { AshbyClient } from "@/server/providers/ashby/client";
 import { AdzunaClient } from "@/server/providers/adzuna/client";
 import { JoobleClient } from "@/server/providers/jooble/client";
 import { ApifyClient } from "@/server/providers/apify/client";
+import { RemoteOkClient } from "@/server/providers/remoteok/client";
 import { getJobById as getDemoJobById } from "@/features/job-search/search";
 
 export async function GET(
@@ -90,7 +91,18 @@ export async function GET(
     return NextResponse.json({ job, source: "live" });
   }
 
-  // 8. Handle Jobvetta job lookup
+  // 8. Handle RemoteOK job lookup
+  if (decodedId.startsWith("remoteok:")) {
+    const externalId = decodedId.replace("remoteok:", "");
+    const remoteok = new RemoteOkClient();
+    const job = await remoteok.getJobById(externalId);
+    if (!job) {
+      return NextResponse.json({ error: "Job not found on RemoteOK" }, { status: 404 });
+    }
+    return NextResponse.json({ job, source: "live" });
+  }
+
+  // 9. Handle Jobvetta job lookup
   if (decodedId.startsWith("jobvetta:")) {
     const externalId = decodedId.replace("jobvetta:", "");
     const client = new JobvettaClient();

@@ -21,8 +21,12 @@ export function filterAndSortJobs(
   const filtered = dataset.filter((job) => {
     // 0. Role Category Filter (e.g. from resume auto-curation)
     if (filters.roleCategories && filters.roleCategories.length > 0) {
-      const category = job.roleCategory || inferRoleCategory(job.title, job.requiredSkills);
-      if (!filters.roleCategories.includes(category)) {
+      const jobCategories = job.roleCategories && job.roleCategories.length > 0
+        ? job.roleCategories
+        : [job.roleCategory || inferRoleCategory(job.title, job.requiredSkills)];
+
+      const hasMatchingCategory = filters.roleCategories.some(cat => jobCategories.includes(cat));
+      if (!hasMatchingCategory) {
         return false;
       }
     }

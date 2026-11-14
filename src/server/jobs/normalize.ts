@@ -4,49 +4,146 @@ import { normalizeIndianLocation } from "./locations";
 import { normalizeSkillList } from "./skills";
 
 /**
- * Infers the high-level role category from title and skills
+ * Validates whether a job posting strictly belongs to software engineering.
+ * Filters out all non-software departments (Sales, Marketing, HR, Accounting, Medical, etc.)
+ */
+export function isSoftwareEngineeringJob(title: string, description = "", skills: string[] = []): boolean {
+  const combinedText = `${title} ${description.slice(0, 1000)} ${skills.join(" ")}`.toLowerCase();
+  const lowerTitle = title.toLowerCase();
+
+  // 1. Explicit exclusions: non-engineering departments and titles
+  const nonTechExclusions = [
+    "accountant", "payroll", "sales", "business development", "bd lead", "account manager",
+    "account executive", "marketing", "recruiter", "recruiting", "talent acquisition",
+    "hr", "hrbp", "human resources", "legal counsel", "tele caller", "tele-caller",
+    "telehealth", "customer support", "customer success", "patient care", "endocrinologist",
+    "security & investigation", "risk operations", "content marketing", "video editor",
+    "medical", "nurse", "billing", "commercial accounts", "field marketing", "field sales",
+    "brand rep", "revenue cycle", "hil support", "procurement", "auditor", "audit", "fraud",
+    "contracts manager", "contract manager", "head of ecosystem", "product manager", "product management",
+    "growth manager", "growth management", "user growth", "paytm ads", "campaign management", "employee experience", "partnerships"
+  ];
+
+  for (const exc of nonTechExclusions) {
+    if (lowerTitle.includes(exc)) {
+      // Allow only if title contains explicit engineering or software keywords
+      const hasSoftwareOverride = /\b(software|developer|devops|sre|sdet|data engineer|ai engineer|ml engineer|backend|frontend|fullstack|firmware|embedded)\b/i.test(lowerTitle);
+      if (!hasSoftwareOverride) {
+        return false;
+      }
+    }
+  }
+
+  // 2. Inclusion criteria: must match at least one software engineering domain
+  const softwarePatterns = [
+    // Frontend
+    /\b(frontend|front-end|ui developer|web developer|react|next\.js|vue|angular|tailwind|javascript|typescript|html|css|mern|mean)\b/i,
+    // Backend
+    /\b(backend|back-end|api|node|python|java\b|golang|\bgo\b|rust|ruby|\bc\+\+|\bc\b|c#|\.net|microservices|server|database|postgresql|redis|mongodb|sql|spring|django|flask|fastapi)\b/i,
+    // Full Stack & General Software Engineering
+    /\b(fullstack|full-stack|full stack|mern|mean|software engineer|software developer|programmer|coder|sde\b|swe\b)\b/i,
+    // Mobile
+    /\b(mobile|android|ios|flutter|react native|swift|kotlin)\b/i,
+    // Cloud & DevOps
+    /\b(devops|sre|cloud|infrastructure engineer|platform engineer|kubernetes|docker|terraform|aws|gcp|azure|ci\/cd|linux)\b/i,
+    // Data & AI / ML
+    /\b(data engineer|data scientist|machine learning|ml\b|artificial intelligence|ai engineer|ai developer|deep learning|nlp|computer vision|analytics engineer|big data|spark)\b/i,
+    // QA & Testing
+    /\b(qa engineer|quality assurance|testing|test engineer|automation engineer|sdet)\b/i,
+  ];
+
+  return softwarePatterns.some(pattern => pattern.test(combinedText));
+}
+
+/**
+ * Infers ALL matching role categories for a job (e.g. Python Developer with Cloud skills gets both Backend and DevOps & Cloud)
+ */
+export function inferRoleCategories(title: string, skills: string[] = [], description = ""): RoleCategory[] {
+  const combinedText = `${title} ${description.slice(0, 1000)} ${skills.join(" ")}`.toLowerCase();
+  const categories = new Set<RoleCategory>();
+
+  // Frontend
+  if (/\b(frontend|front-end|ui developer|web developer|react|next\.js|vue|angular|tailwind|javascript|typescript|html|css|mern|mean)\b/i.test(combinedText)) {
+    categories.add("Frontend");
+  }
+
+  // Backend
+  if (/\b(backend|back-end|api|node|python|java\b|golang|\bgo\b|rust|ruby|\bc\+\+|\bc\b|c#|\.net|microservices|server|database|postgresql|redis|mongodb|sql|spring|django|flask|fastapi)\b/i.test(combinedText)) {
+    categories.add("Backend");
+  }
+
+  // Full Stack
+  if (
+    /\b(fullstack|full-stack|full stack|mern|mean)\b/i.test(combinedText) ||
+    (categories.has("Frontend") && categories.has("Backend")) ||
+    (/\b(software engineer|developer|sde|swe)\b/i.test(combinedText) && !categories.has("Frontend") && !categories.has("Backend"))
+  ) {
+    categories.add("Full Stack");
+  }
+
+  // Mobile
+  if (/\b(mobile|android|ios|flutter|react native|swift|kotlin)\b/i.test(combinedText)) {
+    categories.add("Mobile");
+  }
+
+  // DevOps & Cloud
+  if (/\b(devops|sre|cloud|infrastructure|platform|kubernetes|docker|terraform|aws|gcp|azure|ci\/cd|linux)\b/i.test(combinedText)) {
+    categories.add("DevOps & Cloud");
+  }
+
+  // Data & AI / ML
+  if (/\b(data engineer|data scientist|machine learning|ml\b|artificial intelligence|ai\b|deep learning|nlp|computer vision|analytics|big data|spark|pytorch|tensorflow)\b/i.test(combinedText)) {
+    categories.add("Data & AI");
+  }
+
+  // QA & Testing
+  if (/\b(qa|quality assurance|testing|test|automation engineer|sdet)\b/i.test(combinedText)) {
+    categories.add("QA & Testing");
+  }
+
+  // Product & Design
+  if (/\b(ui\/ux|ux designer|product designer|system design)\b/i.test(combinedText)) {
+    categories.add("Product & Design");
+  }
+
+  if (categories.size === 0) {
+    categories.add("General Tech");
+  }
+
+  return Array.from(categories);
+}
+
+/**
+ * Infers the primary role category from title and skills
  */
 export function inferRoleCategory(title: string, skills: string[] = []): RoleCategory {
   const lowerTitle = title.toLowerCase();
-  const lowerSkills = skills.map(s => s.toLowerCase());
 
-  if (/\b(frontend|front-end|ui developer|web developer|react|vue|angular|css|next\.js)\b/i.test(lowerTitle)) {
-    return "Frontend";
-  }
-  if (/\b(backend|back-end|api|node|python|java|golang|rust|ruby|server|c#|c\+\+|spring|django)\b/i.test(lowerTitle)) {
-    return "Backend";
-  }
-  if (/\b(fullstack|full-stack|full stack)\b/i.test(lowerTitle)) {
-    return "Full Stack";
-  }
-  if (/\b(android|ios|mobile|flutter|react native|swift|kotlin)\b/i.test(lowerTitle)) {
-    return "Mobile";
-  }
-  if (/\b(devops|sre|cloud|infrastructure|platform|kubernetes|docker|terraform|aws)\b/i.test(lowerTitle)) {
-    return "DevOps & Cloud";
-  }
-  if (/\b(data engineer|data scientist|machine learning|ml|ai|deep learning|analytics|nlp|cv)\b/i.test(lowerTitle)) {
+  // Match title first for highest accuracy
+  if (/\b(data engineer|data scientist|machine learning|ml|ai|deep learning|nlp|computer vision)\b/i.test(lowerTitle)) {
     return "Data & AI";
+  }
+  if (/\b(devops|sre|cloud|infrastructure|platform|kubernetes)\b/i.test(lowerTitle)) {
+    return "DevOps & Cloud";
   }
   if (/\b(qa|quality assurance|testing|test|automation engineer|sdet)\b/i.test(lowerTitle)) {
     return "QA & Testing";
   }
-  if (/\b(product manager|product owner|ui\/ux|ux designer|product designer)\b/i.test(lowerTitle)) {
-    return "Product & Design";
+  if (/\b(mobile|android|ios|flutter|react native|swift)\b/i.test(lowerTitle)) {
+    return "Mobile";
   }
-
-  // Fallback to skill cluster inspection
-  if (lowerSkills.some(s => ["react", "next.js", "vue.js", "angular", "html/css", "tailwind css"].includes(s))) {
+  if (/\b(frontend|front-end|ui developer|web developer|react|vue|angular)\b/i.test(lowerTitle)) {
     return "Frontend";
   }
-  if (lowerSkills.some(s => ["node.js", "python", "java", "golang", "postgresql", "mongodb", "redis"].includes(s))) {
+  if (/\b(fullstack|full-stack|full stack)\b/i.test(lowerTitle)) {
+    return "Full Stack";
+  }
+  if (/\b(backend|back-end|api|node|python|java|golang|rust|ruby|server|c#|c\+\+|spring|django)\b/i.test(lowerTitle)) {
     return "Backend";
   }
-  if (lowerSkills.some(s => ["docker", "kubernetes", "aws", "terraform", "ci/cd"].includes(s))) {
-    return "DevOps & Cloud";
-  }
 
-  return "General Tech";
+  const all = inferRoleCategories(title, skills);
+  return all[0] || "General Tech";
 }
 
 /**
@@ -335,6 +432,7 @@ export function normalizeJob(rawInput: unknown): NormalizationResult {
     providerMeta: raw.providerMeta || {},
     isDemo: raw.isDemo ?? false,
     roleCategory: inferRoleCategory(raw.title, requiredSkills),
+    roleCategories: inferRoleCategories(raw.title, requiredSkills, raw.description),
   };
 
   return {

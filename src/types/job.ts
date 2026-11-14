@@ -36,6 +36,7 @@ export interface Job {
   providerMeta: Record<string, unknown>;
   isDemo?: boolean;
   roleCategory?: RoleCategory;
+  roleCategories?: RoleCategory[];
 }
 
 export type RoleCategory =

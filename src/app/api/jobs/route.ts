@@ -10,6 +10,7 @@ import { RemoteOkClient } from "@/server/providers/remoteok/client";
 import { filterAndSortJobs } from "@/features/job-search/search";
 import { DEMO_JOBS } from "@/features/job-search/fixtures";
 import { deduplicateJobs } from "@/server/jobs/deduplicate";
+import { isSoftwareEngineeringJob } from "@/server/jobs/normalize";
 import {
   SearchFilters,
   SortOption,
@@ -202,8 +203,13 @@ export async function GET(request: NextRequest) {
   // Cross-provider 3-tier canonical deduplication
   const deduped = deduplicateJobs(aggregatedJobs);
 
+  // Strict Software Engineering Filter: purge all non-tech roles (sales, HR, accountants, etc.)
+  const softwareOnlyJobs = deduped.uniqueJobs.filter(job =>
+    isSoftwareEngineeringJob(job.title, job.description, job.requiredSkills)
+  );
+
   // Apply user filters & sorting
-  const finalResult = filterAndSortJobs(filters, deduped.uniqueJobs);
+  const finalResult = filterAndSortJobs(filters, softwareOnlyJobs);
 
   return NextResponse.json({
     jobs: finalResult.jobs,

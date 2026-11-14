@@ -21,11 +21,13 @@ export function isSoftwareEngineeringJob(title: string, description = "", skills
     "medical", "nurse", "billing", "commercial accounts", "field marketing", "field sales",
     "brand rep", "revenue cycle", "hil support", "procurement", "auditor", "audit", "fraud",
     "contracts manager", "contract manager", "head of ecosystem", "product manager", "product management",
-    "growth manager", "growth management", "user growth", "paytm ads", "campaign management", "employee experience", "partnerships"
+    "growth manager", "growth management", "user growth", "paytm ads", "campaign management", "employee experience", "partnerships",
+    "cst", "tse", "technical support", "helpdesk", "customer service"
   ];
 
   for (const exc of nonTechExclusions) {
-    if (lowerTitle.includes(exc)) {
+    const excRegex = new RegExp(`(^|[^a-z0-9])${exc}([^a-z0-9]|$)`, "i");
+    if (excRegex.test(lowerTitle)) {
       // Allow only if title contains explicit engineering or software keywords
       const hasSoftwareOverride = /\b(software|developer|devops|sre|sdet|data engineer|ai engineer|ml engineer|backend|frontend|fullstack|firmware|embedded)\b/i.test(lowerTitle);
       if (!hasSoftwareOverride) {
@@ -249,32 +251,39 @@ export function normalizeExperienceLevel(
     return "internship";
   }
 
-  // 2. Fresher / Entry Level / Graduate
-  if (
-    /\b(fresher|entry level|entry-level|entry|trainee|graduate|campus|new grad|college graduate|junior associate|specialist 1|specialist i|engineer 1|engineer i|developer 1|developer i|associate 1|associate i)\b/i.test(combinedText) ||
-    /\b0\s*-\s*1\s*(?:year|yr)|0\s*-\s*2\s*(?:years|yrs)\b/i.test(combinedText) ||
-    /freshers?\s+(can|are\s+welcome\s+to)\s+apply/i.test(combinedText)
-  ) {
-    return "fresher";
-  }
-
-  // 3. Lead / Principal / Director / Staff / Architect / Head / VP / Engineering Manager
+  // 2. Lead / Principal / Director / Staff / Architect / Head / VP / Engineering Manager
   if (
     /\b(principal|architect|director|vp|vice president|head of|cluster head|staff engineer|staff software|engineering manager|tech lead|team lead|technical lead)\b/i.test(combinedText)
   ) {
     return "lead";
   }
 
-  // 4. Senior Level
+  // 3. Senior Level (Check before fresher/junior to avoid "Sr. Software Engineer I" misclassification)
   if (
-    /\b(senior|sr\.|sr\s|iii|iv|level 3|level 4|senior engineer|senior developer|sr software|account executive enterprise|senior manager|sr manager)\b/i.test(combinedText)
+    /\b(senior|sr|iii|iv|level 3|level 4|senior engineer|senior developer|sr software|account executive enterprise|senior manager|sr manager)\b/i.test(combinedText) ||
+    /\bsr\./i.test(combinedText)
   ) {
     return "senior";
   }
 
+  // Guard against senior/lead indicators being mistakenly classified as fresher/junior
+  const hasSeniorLeadIndicator = /\b(senior|sr|lead|principal|staff|director|head|vp)\b|\bsr\./i.test(combinedText);
+
+  // 4. Fresher / Entry Level / Graduate / SDE 1 / Associate Software Engineer
+  if (
+    !hasSeniorLeadIndicator && (
+      /\b(fresher|entry level|entry-level|entry|trainee|graduate|campus|new grad|college graduate|junior associate|associate software|graduate engineer|graduate software|sde\s*1|sde\s*i\b|sde-1|sde-i|software engineer 1|software engineer i\b|engineer 1|engineer i\b|developer 1|developer i\b|associate developer|junior developer|junior engineer|junior software)\b/i.test(combinedText) ||
+      /\b0\s*-\s*1\s*(?:year|yr)|0\s*-\s*2\s*(?:years|yrs)\b/i.test(combinedText) ||
+      /freshers?\s+(can|are\s+welcome\s+to)\s+apply/i.test(combinedText)
+    )
+  ) {
+    return "fresher";
+  }
+
   // 5. Junior / Associate Level
   if (
-    /\b(junior|jr\.|jr\s|associate|coordinator|sourcer|assistant|tele caller|customer support|support specialist)\b/i.test(combinedText)
+    !hasSeniorLeadIndicator &&
+    /\b(junior|jr|associate|coordinator|sourcer|assistant|tele caller|customer support|support specialist)\b/i.test(combinedText)
   ) {
     return "junior";
   }

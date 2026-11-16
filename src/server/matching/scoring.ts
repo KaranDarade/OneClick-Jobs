@@ -79,8 +79,35 @@ export function calculateJobCompatibility(
   let expExplanation = "";
 
   const candidateYrs = candidate.experienceYears;
-  const jobMinYrs = job.experienceRange?.minYears ?? null;
-  const jobMaxYrs = job.experienceRange?.maxYears ?? null;
+  let jobMinYrs = job.experienceRange?.minYears ?? null;
+  let jobMaxYrs = job.experienceRange?.maxYears ?? null;
+
+  // Infer effective experience range from job.experienceLevel if explicit range was omitted (common in ATS boards)
+  if (jobMinYrs === null && jobMaxYrs === null && job.experienceLevel && job.experienceLevel !== "unknown") {
+    switch (job.experienceLevel) {
+      case "internship":
+      case "fresher":
+        jobMinYrs = 0;
+        jobMaxYrs = 1;
+        break;
+      case "junior":
+        jobMinYrs = 1;
+        jobMaxYrs = 3;
+        break;
+      case "mid":
+        jobMinYrs = 3;
+        jobMaxYrs = 5;
+        break;
+      case "senior":
+        jobMinYrs = 5;
+        jobMaxYrs = 8;
+        break;
+      case "lead":
+        jobMinYrs = 8;
+        jobMaxYrs = 15;
+        break;
+    }
+  }
 
   if (candidateYrs === null || (jobMinYrs === null && jobMaxYrs === null)) {
     expFraction = null;
@@ -164,8 +191,8 @@ export function calculateJobCompatibility(
   if (arrFraction !== null) activeComponents.push({ key: "workArrangement", fraction: arrFraction });
   else inactiveComponents.push("workArrangement");
 
-  // If no components are evaluatable (e.g. no skills, no experience, no arrangement), return insufficient_data
-  if (activeComponents.length === 0 || (reqFraction === null && prefFraction === null && expFraction === null)) {
+  // If no components are evaluatable (or job has no skills specified), return insufficient_data
+  if (activeComponents.length === 0 || (!hasReqSkills && !hasPrefSkills) || (reqFraction === null && prefFraction === null && expFraction === null)) {
     return {
       algorithmVersion: ALGORITHM_VERSION,
       overallScore: null,
@@ -261,12 +288,27 @@ export function calculateJobCompatibility(
     breakdowns[c.key].score = componentScore;
   }
 
-  // Bound between 0 and 100
-  const finalScore = Math.min(100, Math.max(0, Math.round(totalScore)));
+  // Seniority Alignment Dampener:
+  // If candidate is a Fresher/Entry-level (<=1 yr) and the job is explicitly Senior or Lead,
+  // cap score so that high-level roles requiring extensive industry leadership are never
+  // falsely surfaced at the top of a fresher's feed.
+  const isCandidateFresher = candidateYrs !== null && candidateYrs <= 1;
+  const isJobSeniorOrLead =
+    job.experienceLevel === "senior" ||
+    job.experienceLevel === "lead" ||
+    (jobMinYrs !== null && jobMinYrs >= 5);
+
+  let finalScore = Math.min(100, Math.max(0, Math.round(totalScore)));
+
+  if (isCandidateFresher && isJobSeniorOrLead) {
+    finalScore = Math.min(45, Math.round(finalScore * 0.45));
+  }
 
   // Generate clear, honest summary text
   let summaryText = "";
-  if (finalScore >= 80) {
+  if (isCandidateFresher && isJobSeniorOrLead) {
+    summaryText = `Low compatibility (${finalScore}/100): Role requires senior/lead industry experience (${job.experienceLevel || "5+ years"}). Geared towards experienced professionals.`;
+  } else if (finalScore >= 80) {
     summaryText = `High compatibility (${finalScore}/100): Strong alignment with required technical skills and qualifications.`;
   } else if (finalScore >= 50) {
     summaryText = `Moderate compatibility (${finalScore}/100): Matches key skills with a few prerequisite gaps.`;

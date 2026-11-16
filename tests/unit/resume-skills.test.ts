@@ -74,6 +74,21 @@ describe("Resume Skill Extraction", () => {
     expect(result.experienceLevelHint).toBe("mid");
   });
 
+  it("detects fresher profile from graduate/student text without explicit year statement", () => {
+    const text = `
+      Priya Sharma
+      Education: B.Tech Computer Science, Graduating 2026
+      Fresh Graduate seeking entry-level software engineer role.
+      Skills: React, JavaScript, HTML/CSS, Tailwind CSS.
+      Projects: E-commerce Website using React and Tailwind CSS.
+    `;
+    const result = extractSkillsFromResume(text);
+    expect(result.detectedSkills).toContain("React");
+    expect(result.detectedSkills).toContain("JavaScript");
+    expect(result.experienceYears).toBe(0);
+    expect(result.experienceLevelHint).toBe("fresher");
+  });
+
   it("handles text with no recognized skills gracefully with warning", () => {
     const nonTechText = `Sales representative with expertise in relationship management and retail negotiation.`;
     const result = extractSkillsFromResume(nonTechText);

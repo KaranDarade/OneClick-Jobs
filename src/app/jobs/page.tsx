@@ -125,9 +125,26 @@ function JobsContent() {
 
     const res = filterAndSortJobs(effectiveFilters, activeDataset);
 
-    // If candidate has a profile, prioritize jobs with higher compatibility score
+    // If candidate has a profile, prioritize jobs with higher compatibility score and experience alignment
     if (hasProfile && (!filters.sortBy || filters.sortBy === "relevance")) {
+      const isCandidateFresher =
+        profile?.experienceLevelHint === "fresher" ||
+        (profile?.experienceYears !== null && profile?.experienceYears !== undefined && profile.experienceYears <= 1);
+
       const scoredJobs = [...res.jobs].sort((a, b) => {
+        // When auto-match is active for a fresher, prioritize fresher and internship roles to the top
+        if (isCandidateFresher && isAutoMatchActive && (!filters.experienceLevels || filters.experienceLevels.length === 0)) {
+          const aIsFresherOrIntern = a.experienceLevel === "fresher" || a.experienceLevel === "internship";
+          const bIsFresherOrIntern = b.experienceLevel === "fresher" || b.experienceLevel === "internship";
+          if (aIsFresherOrIntern && !bIsFresherOrIntern) return -1;
+          if (!aIsFresherOrIntern && bIsFresherOrIntern) return 1;
+
+          const aIsJunior = a.experienceLevel === "junior";
+          const bIsJunior = b.experienceLevel === "junior";
+          if (aIsJunior && !bIsJunior) return -1;
+          if (!aIsJunior && bIsJunior) return 1;
+        }
+
         const scoreA = getJobScore(a)?.overallScore || 0;
         const scoreB = getJobScore(b)?.overallScore || 0;
         if (scoreA !== scoreB) return scoreB - scoreA;
@@ -193,7 +210,7 @@ function JobsContent() {
       </div>
 
       {/* Auto-Match Candidate Banner */}
-      {hasProfile && profile?.detectedRoleCategory && (
+      {hasProfile && (profile?.detectedRoleCategory || profile?.experienceLevelHint) && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs">
@@ -203,8 +220,8 @@ function JobsContent() {
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-blue-950">
                   {isAutoMatchActive
-                    ? `Curated for your resume: ${profile.detectedRoleCategory} roles`
-                    : `Resume Profile Detected (${profile.detectedRoleCategory})`}
+                    ? `Curated for your resume: ${profile.detectedRoleCategory || "Engineering"}${profile.experienceLevelHint === "fresher" ? " • Fresher & Entry-Level" : ""}`
+                    : `Resume Profile Detected (${profile.detectedRoleCategory || "Tech"}${profile.experienceLevelHint ? ` • ${profile.experienceLevelHint}` : ""})`}
                 </h2>
                 <span className="rounded-full bg-blue-200/60 px-2 py-0.5 text-[10px] font-bold text-blue-800 uppercase">
                   {searchResult.totalCount} matches
@@ -212,8 +229,10 @@ function JobsContent() {
               </div>
               <p className="text-xs text-blue-800/80 mt-0.5">
                 {isAutoMatchActive
-                  ? `Feed automatically prioritized based on your ${profile.extractedSkills.length} extracted skills & experience.`
-                  : "Showing all roles across tech disciplines."}
+                  ? profile.experienceLevelHint === "fresher"
+                    ? `Feed prioritized for Freshers & Internships based on your ${profile.extractedSkills.length} extracted skills (${profile.extractedSkills.slice(0, 4).join(", ")}). Senior roles are ranked lower.`
+                    : `Feed automatically prioritized based on your ${profile.extractedSkills.length} extracted skills & ${profile.experienceYears ? `${profile.experienceYears} yrs experience` : "experience level"}.`
+                  : "Showing all roles across tech disciplines and seniority levels."}
               </p>
             </div>
           </div>
@@ -224,7 +243,7 @@ function JobsContent() {
               onClick={() => setIsAutoMatchActive(!isAutoMatchActive)}
               className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-blue-900 border border-blue-200 shadow-2xs hover:bg-blue-50 transition-colors"
             >
-              {isAutoMatchActive ? "Show All Tech Disciplines" : `Filter by ${profile.detectedRoleCategory}`}
+              {isAutoMatchActive ? "Show Unfiltered Feed" : `Auto-Curate for My Resume`}
             </button>
           </div>
         </div>

@@ -336,8 +336,20 @@ export function extractSkillsFromResume(text: string): SkillExtractionResult {
     }
   }
 
-  // Level classification hint
-  if (experienceYears !== null) {
+  // 2b. Fresher / Entry-Level Heuristics: if explicit multi-year statement is absent,
+  // check for student, fresh graduate, intern, entry-level, or recent graduation year indicators
+  const hasFresherIndicator = /\b(fresher|entry-level|entry level|graduate trainee|college graduate|recent graduate|fresh graduate|student|intern|internship|campus recruitment|seeking entry-level|seeking an entry level|seeking my first role)\b/i.test(text);
+  const isRecentGrad = /(?:b\.?tech|b\.?e|bca|mca|b\.?sc|m\.?sc|graduation|passing year)[^\n\r]{0,40}(?:202[2-7])/i.test(text);
+
+  if (experienceYears === null) {
+    if (hasFresherIndicator || isRecentGrad) {
+      experienceYears = 0;
+      experienceLevelHint = "fresher";
+    }
+  }
+
+  // Level classification hint from detected years
+  if (experienceYears !== null && experienceLevelHint === null) {
     if (experienceYears < 1) experienceLevelHint = "fresher";
     else if (experienceYears <= 2) experienceLevelHint = "junior";
     else if (experienceYears <= 5) experienceLevelHint = "mid";

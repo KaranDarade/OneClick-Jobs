@@ -139,4 +139,41 @@ describe("Deterministic Compatibility Scoring Algorithm", () => {
     expect(res1.summaryText).toBe(res2.summaryText);
     expect(res1.matchingRequiredSkills).toEqual(res2.matchingRequiredSkills);
   });
+
+  it("prioritizes fresher/entry roles and dampens senior/lead roles for a fresher candidate", () => {
+    const fresherCandidate: CandidateProfile = {
+      id: "fresher-1",
+      extractedSkills: ["React", "TypeScript", "Node.js"],
+      userSkills: ["React", "TypeScript", "Node.js"],
+      experienceYears: 0,
+      experienceLevelHint: "fresher",
+      preferredArrangements: ["remote"],
+      parsedAt: new Date().toISOString(),
+      parsingWarnings: [],
+    };
+
+    const fresherJob: Job = {
+      ...baseJob,
+      title: "Graduate Software Engineer (Frontend)",
+      experienceRange: null,
+      experienceLevel: "fresher",
+      workArrangement: "remote",
+    };
+
+    const seniorJob: Job = {
+      ...baseJob,
+      title: "Lead Architect / Staff Engineer",
+      experienceRange: null,
+      experienceLevel: "lead",
+      workArrangement: "remote",
+    };
+
+    const fresherScore = calculateJobCompatibility(fresherCandidate, fresherJob);
+    const seniorScore = calculateJobCompatibility(fresherCandidate, seniorJob);
+
+    expect(fresherScore.overallScore).toBeGreaterThanOrEqual(80);
+    expect(seniorScore.overallScore).toBeLessThanOrEqual(45);
+    expect(fresherScore.overallScore!).toBeGreaterThan(seniorScore.overallScore!);
+    expect(seniorScore.summaryText).toContain("Role requires senior/lead industry experience");
+  });
 });

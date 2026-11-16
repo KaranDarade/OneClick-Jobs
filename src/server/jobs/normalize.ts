@@ -269,10 +269,11 @@ export function normalizeExperienceLevel(
   // Guard against senior/lead indicators being mistakenly classified as fresher/junior
   const hasSeniorLeadIndicator = /\b(senior|sr|lead|principal|staff|director|head|vp)\b|\bsr\./i.test(combinedText);
 
-  // 4. Fresher / Entry Level / Graduate / SDE 1 / Associate Software Engineer
+  // 4. Fresher / Entry Level / Graduate / SDE 1 / L1 / Associate Software Engineer
   if (
     !hasSeniorLeadIndicator && (
-      /\b(fresher|entry level|entry-level|entry|trainee|graduate|campus|new grad|college graduate|junior associate|associate software|graduate engineer|graduate software|sde\s*1|sde\s*i\b|sde-1|sde-i|software engineer 1|software engineer i\b|engineer 1|engineer i\b|developer 1|developer i\b|associate developer|junior developer|junior engineer|junior software)\b/i.test(combinedText) ||
+      /\b(fresher|entry level|entry-level|entry|trainee|graduate|campus|new grad|college graduate|junior associate|associate software|associate developer|associate engineer|graduate engineer|graduate software|sde\s*1|sde\s*i\b|sde-1|sde-i|software engineer 1|software engineer i\b|engineer 1|engineer i\b|developer 1|developer i\b|junior developer|junior engineer|junior software|l1\b|l-1\b|ic1\b|ic-1\b|level 1\b|band 1\b)\b/i.test(combinedText) ||
+      /\((?:l1|l-1|ic1|ic-1|level\s*1)\)/i.test(combinedText) ||
       /\b0\s*-\s*1\s*(?:year|yr)|0\s*-\s*2\s*(?:years|yrs)\b/i.test(combinedText) ||
       /freshers?\s+(can|are\s+welcome\s+to)\s+apply/i.test(combinedText)
     )

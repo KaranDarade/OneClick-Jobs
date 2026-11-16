@@ -82,6 +82,8 @@ export async function POST(request: NextRequest) {
         userSkills: skillResult.detectedSkills, // Defaults to extracted skills
         experienceYears: skillResult.experienceYears,
         experienceLevelHint: skillResult.experienceLevelHint,
+        isFresher: skillResult.isFresher,
+        internshipExperience: skillResult.internshipExperience,
         detectedRoleCategory: skillResult.detectedRoleCategory,
         secondaryRoleCategories: skillResult.secondaryRoleCategories,
         projects: skillResult.projects,

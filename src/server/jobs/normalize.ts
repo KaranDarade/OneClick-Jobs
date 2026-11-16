@@ -58,6 +58,98 @@ export function isSoftwareEngineeringJob(title: string, description = "", skills
 }
 
 /**
+ * Validates that a job application URL points directly to an official job posting or ATS application portal.
+ * Strictly excludes any URLs that lead to login walls, account registration gates, or unauthorized third-party apps.
+ */
+export function isDirectApplicationUrl(url?: string | null, providerId?: string): boolean {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim().toLowerCase();
+
+  // 1. Explicitly check for unauthorized login, sign-in, authentication, or registration walls
+  const loginWallPatterns = [
+    "/login",
+    "signin",
+    "sign-in",
+    "/auth/",
+    "/register",
+    "/signup",
+    "sign-up",
+    "accounts.google.com",
+    "login.microsoftonline.com",
+    "appleid.apple.com",
+    "checkpoint",
+    "session/new",
+    "user/login",
+    "oauth/authorize",
+    "redirect_uri",
+    "auth0.com",
+    "clerk.accounts",
+  ];
+
+  for (const pattern of loginWallPatterns) {
+    if (trimmed.includes(pattern)) {
+      return false;
+    }
+  }
+
+  // 2. Direct ATS & Verified Career Platforms (100% Free 1-Click Direct Application)
+  const trustedDirectDomains = [
+    "boards.greenhouse.io",
+    "greenhouse.io",
+    "jobs.lever.co",
+    "lever.co",
+    "jobs.ashbyhq.com",
+    "ashbyhq.com",
+    "remoteok.com",
+    "workable.com",
+    "smartrecruiters.com",
+    "jobvite.com",
+    "bamboohr.com",
+    "recruitee.com",
+    "breezy.hr",
+    "rippling-ats.com",
+    "myworkdayjobs.com",
+    "oraclecloud.com",
+    "icims.com",
+    "oneclickjobs.in",
+  ];
+
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+
+    if (trustedDirectDomains.some(d => host === d || host.endsWith("." + d))) {
+      return true;
+    }
+
+    // Direct employer career paths (e.g. company.com/careers/..., company.com/jobs/...)
+    if (
+      (parsed.pathname.includes("/careers") ||
+       parsed.pathname.includes("/jobs") ||
+       parsed.pathname.includes("/job/") ||
+       parsed.pathname.includes("/positions") ||
+       parsed.pathname.includes("/openings")) &&
+      !host.includes("facebook.com") &&
+      !host.includes("twitter.com") &&
+      !host.includes("instagram.com")
+    ) {
+      return true;
+    }
+  } catch {
+    if (trustedDirectDomains.some(d => trimmed.includes(d))) {
+      return true;
+    }
+  }
+
+  // Known trusted direct providers
+  if (providerId && ["greenhouse", "lever", "ashby", "remoteok", "demo", "demo-curator"].includes(providerId)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Infers ALL matching role categories for a job (e.g. Python Developer with Cloud skills gets both Backend and DevOps & Cloud)
  */
 export function inferRoleCategories(title: string, skills: string[] = [], description = ""): RoleCategory[] {
@@ -400,6 +492,8 @@ export function normalizeJob(rawInput: unknown): NormalizationResult {
     salaryMax = temp;
   }
 
+  const directApply = isDirectApplicationUrl(raw.originalUrl.trim(), raw.providerId.trim());
+
   const normalizedJob: Job = {
     id: raw.id || `${raw.providerId}:${raw.externalId}`,
     providerId: raw.providerId.trim(),
@@ -439,7 +533,10 @@ export function normalizeJob(rawInput: unknown): NormalizationResult {
     lastSeenAt: validLastSeenAt,
     lastRefreshedAt: now,
     status: (raw.status as JobStatus) || "active",
-    providerMeta: raw.providerMeta || {},
+    providerMeta: {
+      ...(raw.providerMeta || {}),
+      isDirectApply: directApply,
+    },
     isDemo: raw.isDemo ?? false,
     roleCategory: inferRoleCategory(raw.title, requiredSkills),
     roleCategories: inferRoleCategories(raw.title, requiredSkills, raw.description),

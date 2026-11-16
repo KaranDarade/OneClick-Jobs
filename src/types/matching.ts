@@ -12,6 +12,8 @@ export interface CandidateProfile {
   userSkills: string[]; // Allows user additions/removals
   experienceYears: number | null;
   experienceLevelHint: string | null;
+  isFresher?: boolean;
+  internshipExperience?: boolean;
   detectedRoleCategory?: RoleCategory | null;
   secondaryRoleCategories?: RoleCategory[];
   projects?: CandidateProject[];

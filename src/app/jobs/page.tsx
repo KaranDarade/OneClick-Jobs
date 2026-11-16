@@ -9,6 +9,7 @@ import { JobCard } from "@/components/jobs/job-card";
 import { FilterPanel } from "@/components/filters/filter-panel";
 import { SearchControls } from "@/components/filters/search-controls";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pagination } from "@/components/ui/pagination";
 import { useCandidateProfile } from "@/features/matching/useCandidateProfile";
 import { X, SlidersHorizontal, Radio, ShieldCheck, Zap, Sparkles } from "lucide-react";
 
@@ -113,9 +114,28 @@ function JobsContent() {
   // Active dataset: API response jobs, with offline fallback to local DEMO_JOBS
   const activeDataset = apiData ? apiData.jobs : DEMO_JOBS;
 
+  // Pagination state (10 jobs per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
   // Compute filtered & sorted results locally for instant client-side responsiveness
   const searchResult = useMemo(() => {
     let effectiveFilters = { ...filters };
+
+    const isCandidateFresher =
+      Boolean(profile?.isFresher) ||
+      profile?.experienceLevelHint === "fresher" ||
+      (profile?.experienceYears !== null && profile?.experienceYears !== undefined && profile.experienceYears <= 1);
+
+    // Enforce strict fresher gate when fresher mode is active or detected on candidate resume
+    if (filters.isFresherOnly || (hasProfile && isAutoMatchActive && isCandidateFresher)) {
+      effectiveFilters.isFresherOnly = true;
+    }
 
     // If auto-match is enabled and user has a detected role category (e.g. Frontend),
     // and hasn't explicitly selected different role categories
@@ -127,10 +147,6 @@ function JobsContent() {
 
     // If candidate has a profile, prioritize jobs with higher compatibility score and experience alignment
     if (hasProfile && (!filters.sortBy || filters.sortBy === "relevance")) {
-      const isCandidateFresher =
-        profile?.experienceLevelHint === "fresher" ||
-        (profile?.experienceYears !== null && profile?.experienceYears !== undefined && profile.experienceYears <= 1);
-
       const scoredJobs = [...res.jobs].sort((a, b) => {
         // When auto-match is active for a fresher, prioritize fresher and internship roles to the top
         if (isCandidateFresher && isAutoMatchActive && (!filters.experienceLevels || filters.experienceLevels.length === 0)) {
@@ -159,6 +175,11 @@ function JobsContent() {
     return res;
   }, [filters, activeDataset, hasProfile, isAutoMatchActive, profile, getJobScore]);
 
+  const paginatedJobs = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return searchResult.jobs.slice(start, start + PAGE_SIZE);
+  }, [searchResult.jobs, currentPage]);
+
   const handleResetFilters = () => {
     setFilters({
       query: "",
@@ -166,6 +187,7 @@ function JobsContent() {
       workArrangements: [],
       experienceLevels: [],
       employmentTypes: [],
+      isFresherOnly: false,
       postingAge: null,
       sortBy: "relevance",
     });
@@ -311,9 +333,20 @@ function JobsContent() {
             </div>
           ) : (
             <div className="space-y-3">
-              {searchResult.jobs.map((job) => (
+              {paginatedJobs.map((job) => (
                 <JobCard key={job.id} job={job} />
               ))}
+
+              {/* 10 Jobs Per Page Pagination */}
+              <Pagination
+                currentPage={currentPage}
+                totalCount={searchResult.totalCount}
+                pageSize={PAGE_SIZE}
+                onPageChange={(page) => {
+                  setCurrentPage(page);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
             </div>
           )}
         </div>

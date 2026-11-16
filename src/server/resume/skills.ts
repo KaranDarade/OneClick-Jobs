@@ -6,6 +6,8 @@ export interface SkillExtractionResult {
   detectedSkills: string[];
   experienceYears: number | null;
   experienceLevelHint: string | null;
+  isFresher: boolean;
+  internshipExperience: boolean;
   detectedRoleCategory: RoleCategory;
   secondaryRoleCategories: RoleCategory[];
   projects: CandidateProject[];
@@ -295,6 +297,8 @@ export function extractSkillsFromResume(text: string): SkillExtractionResult {
       detectedSkills: [],
       experienceYears: null,
       experienceLevelHint: null,
+      isFresher: false,
+      internshipExperience: false,
       detectedRoleCategory: "General Tech",
       secondaryRoleCategories: [],
       projects: [],
@@ -366,14 +370,18 @@ export function extractSkillsFromResume(text: string): SkillExtractionResult {
   // 3. Classify primary and secondary role categories
   const { primary: detectedRoleCategory, secondary: secondaryRoleCategories } = classifyRoleCategory(finalSkills, text);
 
-  // 4. Extract projects and education
+  // 4. Extract projects, education, fresher and internship indicators
   const projects = extractProjectsFromResume(text, finalSkills);
   const educationHint = extractEducationFromResume(text);
+  const internshipExperience = /\b(intern|internship|trainee)\b/i.test(text);
+  const isFresher = experienceLevelHint === "fresher" || (experienceYears !== null && experienceYears <= 1) || hasFresherIndicator;
 
   return {
     detectedSkills: finalSkills,
     experienceYears,
     experienceLevelHint,
+    isFresher,
+    internshipExperience,
     detectedRoleCategory,
     secondaryRoleCategories,
     projects,

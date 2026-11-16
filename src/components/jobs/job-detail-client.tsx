@@ -28,18 +28,33 @@ interface JobDetailClientProps {
 
 export function JobDetailClient({ job }: JobDetailClientProps) {
   const { isSaved, toggleSave } = useSavedJobs();
-  const { getJobScore, hasProfile } = useCandidateProfile();
+  const { getJobScore, hasProfile, profile } = useCandidateProfile();
   const saved = isSaved(job.id);
 
   // Compute live deterministic score
   const scoreResult = hasProfile ? getJobScore(job) : null;
   const matchScore = scoreResult?.overallScore ?? (Number(job.providerMeta?.matchScore) || 0);
 
+  const isFresherCandidate =
+    Boolean(profile?.isFresher) ||
+    profile?.experienceLevelHint === "fresher" ||
+    (profile?.experienceYears !== null && profile?.experienceYears !== undefined && profile.experienceYears <= 1);
+
+  const isFresherFriendly =
+    job.experienceLevel === "fresher" ||
+    job.experienceLevel === "internship" ||
+    (job.experienceRange?.minYears !== null && job.experienceRange?.minYears !== undefined && job.experienceRange.minYears <= 1) ||
+    /\b(fresher|intern|internship|graduate|entry level|trainee)\b/i.test(job.title);
+
   const getCompanyInitial = (name: string) => {
     return name.trim().charAt(0).toUpperCase() || "J";
   };
 
-  const externalLinks = buildExternalJobSearchLinks(job.title, job.normalizedCity || job.originalLocation);
+  const externalLinks = buildExternalJobSearchLinks(
+    job.title,
+    job.normalizedCity || job.originalLocation,
+    isFresherCandidate
+  );
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
@@ -122,18 +137,25 @@ export function JobDetailClient({ job }: JobDetailClientProps) {
         </div>
 
         {/* Highlighted Application Redirection Box */}
-        <div className="rounded-2xl border-2 border-blue-600 bg-gradient-to-r from-blue-50 via-white to-blue-50/40 p-5 sm:p-6 shadow-sm">
+        <div className="rounded-2xl border-2 border-emerald-500 bg-gradient-to-r from-emerald-50/80 via-white to-blue-50/40 p-5 sm:p-6 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-blue-100/80 px-2.5 py-0.5 text-[11px] font-bold text-blue-800 uppercase tracking-wider">
-                <span className="flex h-2 w-2 rounded-full bg-blue-600 animate-pulse"></span>
-                <span>Verified Direct Application</span>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 px-3 py-1 text-xs font-bold uppercase tracking-wider">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Direct 1-Click Apply • No 3rd-Party Login Required</span>
+                </span>
+                {isFresherFriendly && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-900 border border-blue-200 px-2.5 py-1 text-xs font-bold">
+                    🌱 Fresher Friendly
+                  </span>
+                )}
               </div>
-              <h3 className="text-base font-bold text-neutral-900">
-                Apply on {job.sourceAttribution || job.company}
+              <h3 className="text-lg font-bold text-neutral-900">
+                Apply Directly on {job.company}&apos;s Official Portal
               </h3>
               <p className="text-xs text-neutral-600 max-w-xl leading-relaxed">
-                Clicking the link opens the original application page directly on the employer&apos;s verified portal. Zero middleman fees, zero resume retention.
+                This opening links straight to the official employer ATS board ({job.sourceAttribution || job.company}). You will not encounter third-party account registration walls, middleman sign-ins, or gated forms.
               </p>
             </div>
 
@@ -142,9 +164,9 @@ export function JobDetailClient({ job }: JobDetailClientProps) {
                 href={job.originalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 active:scale-[0.98] transition-all"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 px-6 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-600 active:scale-[0.98] transition-all"
               >
-                <span>Apply Link</span>
+                <span>Apply on Official Portal</span>
                 <ExternalLink className="h-4 w-4" />
               </a>
             </div>

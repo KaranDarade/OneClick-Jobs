@@ -288,20 +288,94 @@ export function calculateJobCompatibility(
     breakdowns[c.key].score = componentScore;
   }
 
+  // ==========================================
+  // Project & Technology Resonance Boost:
+  // If candidate has projects mentioning technologies required by this job (e.g. React projects, MERN, Node.js),
+  // apply a targeted boost so that hands-on project experience floats relevant roles to the top.
+  // ==========================================
+  let projectResonanceBonus = 0;
+  const projectTechs = new Set<string>();
+
+  if (candidate.projects && candidate.projects.length > 0) {
+    for (const proj of candidate.projects) {
+      if (proj.technologies) {
+        for (const t of proj.technologies) {
+          projectTechs.add(t.toLowerCase());
+        }
+      }
+      const projText = `${proj.title} ${proj.description || ""}`.toLowerCase();
+      if (/\breact\b/i.test(projText)) projectTechs.add("react");
+      if (/\bnext\.?js\b/i.test(projText)) projectTechs.add("next.js");
+      if (/\bnode\.?js\b/i.test(projText)) projectTechs.add("node.js");
+      if (/\bexpress\b/i.test(projText)) projectTechs.add("express");
+      if (/\bmongo\b|mongodb/i.test(projText)) projectTechs.add("mongodb");
+      if (/\bmern\b/i.test(projText)) {
+        projectTechs.add("react");
+        projectTechs.add("node.js");
+        projectTechs.add("mongodb");
+        projectTechs.add("express");
+      }
+      if (/\bpython\b/i.test(projText)) projectTechs.add("python");
+      if (/\bjava\b/i.test(projText)) projectTechs.add("java");
+    }
+  }
+
+  const jobTitleLower = job.title.toLowerCase();
+  const jobReqSkillsLower = (job.requiredSkills || []).map((s) => s.toLowerCase());
+
+  // Check React / MERN resonance: React projects strongly boost React, MERN, and Frontend developer roles
+  const hasReactProjects = projectTechs.has("react") || projectTechs.has("next.js");
+  const isReactJob =
+    /\b(react|mern|frontend|front-end|ui developer)\b/i.test(jobTitleLower) ||
+    jobReqSkillsLower.some((s) => s.includes("react"));
+
+  if (hasReactProjects && isReactJob) {
+    projectResonanceBonus += 12;
+    if (/\b(mern|react\.?js|react developer|frontend developer)\b/i.test(jobTitleLower)) {
+      projectResonanceBonus += 6; // Extra boost for direct title & stack match
+    }
+  } else if (projectTechs.size > 0) {
+    let matchedProjectTech = 0;
+    for (const pt of projectTechs) {
+      if (jobReqSkillsLower.some((s) => s.includes(pt)) || jobTitleLower.includes(pt)) {
+        matchedProjectTech++;
+      }
+    }
+    if (matchedProjectTech > 0) {
+      projectResonanceBonus += Math.min(15, matchedProjectTech * 5);
+    }
+  }
+
+  // Fresher & Internship Boost:
+  // If candidate is a fresher or has internship experience, reward fresher-friendly openings
+  const isCandidateFresher =
+    candidate.isFresher ||
+    candidate.experienceLevelHint === "fresher" ||
+    (candidateYrs !== null && candidateYrs <= 1);
+
+  const isFresherJob =
+    job.experienceLevel === "fresher" ||
+    job.experienceLevel === "internship" ||
+    (jobMinYrs !== null && jobMinYrs <= 1) ||
+    /\b(fresher|intern|internship|graduate|entry level|trainee)\b/i.test(jobTitleLower);
+
+  if (isCandidateFresher && isFresherJob) {
+    projectResonanceBonus += 8;
+  }
+
   // Seniority Alignment Dampener:
   // If candidate is a Fresher/Entry-level (<=1 yr) and the job is explicitly Senior or Lead,
   // cap score so that high-level roles requiring extensive industry leadership are never
   // falsely surfaced at the top of a fresher's feed.
-  const isCandidateFresher = candidateYrs !== null && candidateYrs <= 1;
   const isJobSeniorOrLead =
     job.experienceLevel === "senior" ||
     job.experienceLevel === "lead" ||
     (jobMinYrs !== null && jobMinYrs >= 5);
 
-  let finalScore = Math.min(100, Math.max(0, Math.round(totalScore)));
+  let finalScore = Math.min(100, Math.max(0, Math.round(totalScore + projectResonanceBonus)));
 
   if (isCandidateFresher && isJobSeniorOrLead) {
-    finalScore = Math.min(45, Math.round(finalScore * 0.45));
+    finalScore = Math.min(35, Math.round(finalScore * 0.35));
   }
 
   // Generate clear, honest summary text

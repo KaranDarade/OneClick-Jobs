@@ -85,6 +85,7 @@ export interface SearchFilters {
   experienceLevels: ExperienceLevel[];
   employmentTypes: EmploymentType[];
   roleCategories?: RoleCategory[];
+  isFresherOnly?: boolean;
   postingAge: PostingAge | null;
   sortBy: SortOption;
 }

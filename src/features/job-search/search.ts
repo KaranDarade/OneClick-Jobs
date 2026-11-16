@@ -19,7 +19,30 @@ export function filterAndSortJobs(
   const normalizedQuerySkill = query ? normalizeSkillName(query).toLowerCase() : "";
 
   const filtered = dataset.filter((job) => {
-    // 0. Role Category Filter (e.g. from resume auto-curation)
+    // 0.1 Strict Fresher Only Gate (When user selects Fresher on landing or active filter)
+    if (filters.isFresherOnly) {
+      const isSeniorOrLead =
+        job.experienceLevel === "senior" ||
+        job.experienceLevel === "lead" ||
+        (job.experienceRange?.minYears !== null && job.experienceRange?.minYears !== undefined && job.experienceRange.minYears >= 2);
+
+      if (isSeniorOrLead) {
+        return false;
+      }
+
+      const isFresherFriendly =
+        job.experienceLevel === "fresher" ||
+        job.experienceLevel === "internship" ||
+        job.experienceLevel === "junior" ||
+        (job.experienceRange?.minYears !== null && job.experienceRange?.minYears !== undefined && job.experienceRange.minYears <= 1) ||
+        /\b(fresher|intern|internship|graduate|entry level|trainee|associate)\b/i.test(job.title);
+
+      if (!isFresherFriendly) {
+        return false;
+      }
+    }
+
+    // 0.2 Role Category Filter (e.g. from resume auto-curation)
     if (filters.roleCategories && filters.roleCategories.length > 0) {
       const jobCategories = job.roleCategories && job.roleCategories.length > 0
         ? job.roleCategories

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MemoryCache } from "@/server/cache";
 import { JobvettaClient } from "@/server/providers/jobvetta/client";
 import { GreenhouseClient } from "@/server/providers/greenhouse/client";
 import { LeverClient } from "@/server/providers/lever/client";
@@ -21,6 +22,17 @@ import {
   Job,
 } from "@/types/job";
 
+interface CachedJobAggregate {
+  softwareOnlyJobs: Job[];
+  isLive: boolean;
+  providerNotice?: string;
+  jobvettaRemaining?: number;
+  jobvettaLimit?: number;
+}
+
+// 10-minute global in-memory cache for aggregated software jobs
+const globalJobsAggregateCache = new MemoryCache<CachedJobAggregate>(10 * 60 * 1000);
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
 
@@ -29,6 +41,7 @@ export async function GET(request: NextRequest) {
   const daysStr = searchParams.get("days") || searchParams.get("age");
   const limitStr = searchParams.get("limit") || "50";
   const sortBy = (searchParams.get("sort") as SortOption) || "relevance";
+  const forceRefresh = searchParams.get("refresh") === "true";
 
   // Parse filter arrays
   const arrangements = searchParams.getAll("arrangement") as WorkArrangement[];
@@ -47,6 +60,24 @@ export async function GET(request: NextRequest) {
     postingAge: (daysStr as PostingAge) || null,
     sortBy,
   };
+
+  // Fast-path: serve instantly from top-level aggregate cache if available and not forcing refresh
+  if (!forceRefresh) {
+    const cached = globalJobsAggregateCache.get("all_software_jobs");
+    if (cached && cached.softwareOnlyJobs.length > 0) {
+      const finalResult = filterAndSortJobs(filters, cached.softwareOnlyJobs);
+      return NextResponse.json({
+        jobs: finalResult.jobs,
+        total: finalResult.totalCount,
+        count: finalResult.jobs.length,
+        source: cached.isLive ? "cache" : "demo",
+        isDemo: false,
+        notice: cached.providerNotice,
+        rateLimitRemaining: cached.jobvettaRemaining,
+        rateLimitLimit: cached.jobvettaLimit,
+      });
+    }
+  }
 
   const aggregatedJobs: Job[] = [];
   let isLive = false;
@@ -207,6 +238,17 @@ export async function GET(request: NextRequest) {
   const softwareOnlyJobs = deduped.uniqueJobs.filter(job =>
     isSoftwareEngineeringJob(job.title, job.description, job.requiredSkills)
   );
+
+  // Store in global aggregate cache for ultra-fast instant sub-millisecond filtering
+  if (softwareOnlyJobs.length > 0) {
+    globalJobsAggregateCache.set("all_software_jobs", {
+      softwareOnlyJobs,
+      isLive,
+      providerNotice,
+      jobvettaRemaining,
+      jobvettaLimit,
+    });
+  }
 
   // Apply user filters & sorting
   const finalResult = filterAndSortJobs(filters, softwareOnlyJobs);

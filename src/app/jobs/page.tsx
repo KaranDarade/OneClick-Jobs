@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, Suspense, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState, useMemo, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { SearchFilters, SortOption, Job } from "@/types/job";
 import { filterAndSortJobs } from "@/features/job-search/search";
 import { DEMO_JOBS } from "@/features/job-search/fixtures";
@@ -25,7 +25,6 @@ interface ApiJobsResponse {
 
 function JobsContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const { profile, hasProfile, isAutoMatchActive, setIsAutoMatchActive, getJobScore } = useCandidateProfile();
 
   // Read initial filter values from URL search params
@@ -48,7 +47,7 @@ function JobsContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Sync state changes back to URL parameters
+  // Sync state changes back to URL parameters seamlessly without triggering full Next.js page revalidation
   useEffect(() => {
     const params = new URLSearchParams();
     if (filters.query) params.set("q", filters.query);
@@ -57,41 +56,59 @@ function JobsContent() {
 
     const qs = params.toString();
     const newPath = qs ? `/jobs?${qs}` : "/jobs";
-    router.replace(newPath, { scroll: false });
-  }, [filters.query, filters.location, filters.sortBy, router]);
-
-  // Fetch jobs from server Route Handler /api/jobs
-  const fetchJobs = useCallback(async () => {
-    setIsLoading(true);
-    setFetchError(null);
-
-    const params = new URLSearchParams();
-    if (filters.query) params.set("q", filters.query);
-    if (filters.location && filters.location !== "All India") params.set("location", filters.location);
-    if (filters.sortBy) params.set("sort", filters.sortBy);
-    if (filters.postingAge) params.set("days", filters.postingAge);
-
-    filters.workArrangements.forEach((arr) => params.append("arrangement", arr));
-    filters.experienceLevels.forEach((exp) => params.append("experience", exp));
-    filters.employmentTypes.forEach((emp) => params.append("employment", emp));
-
-    try {
-      const res = await fetch(`/api/jobs?${params.toString()}`);
-      if (!res.ok) {
-        throw new Error(`Server returned error (${res.status})`);
-      }
-      const data: ApiJobsResponse = await res.json();
-      setApiData(data);
-    } catch {
-      setFetchError("Unable to reach search service; falling back to offline demo index.");
-    } finally {
-      setIsLoading(false);
+    if (typeof window !== "undefined" && (window.location.pathname + window.location.search) !== newPath) {
+      window.history.replaceState(null, "", newPath);
     }
-  }, [filters]);
+  }, [filters.query, filters.location, filters.sortBy]);
 
+  // Fetch jobs with in-flight abort controller to prevent race conditions & UI glitches
   useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+    const controller = new AbortController();
+    let isCancelled = false;
+
+    async function load() {
+      setIsLoading(true);
+      setFetchError(null);
+
+      const params = new URLSearchParams();
+      if (filters.query) params.set("q", filters.query);
+      if (filters.location && filters.location !== "All India") params.set("location", filters.location);
+      if (filters.sortBy) params.set("sort", filters.sortBy);
+      if (filters.postingAge) params.set("days", filters.postingAge);
+
+      filters.workArrangements.forEach((arr) => params.append("arrangement", arr));
+      filters.experienceLevels.forEach((exp) => params.append("experience", exp));
+      filters.employmentTypes.forEach((emp) => params.append("employment", emp));
+
+      try {
+        const res = await fetch(`/api/jobs?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          throw new Error(`Server returned error (${res.status})`);
+        }
+        const data: ApiJobsResponse = await res.json();
+        if (!isCancelled) {
+          setApiData(data);
+        }
+      } catch (err: unknown) {
+        if (!isCancelled && (err as Error)?.name !== "AbortError") {
+          setFetchError("Unable to reach search service; falling back to offline demo index.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+    };
+  }, [filters]);
 
   // Active dataset: API response jobs, with offline fallback to local DEMO_JOBS
   const activeDataset = apiData ? apiData.jobs : DEMO_JOBS;

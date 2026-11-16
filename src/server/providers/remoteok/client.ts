@@ -1,5 +1,6 @@
 import { Job } from "@/types/job";
 import { normalizeJob } from "@/server/jobs/normalize";
+import { MemoryCache } from "@/server/cache";
 
 interface RemoteOkRawJob {
   id?: string | number;
@@ -17,6 +18,8 @@ interface RemoteOkRawJob {
   apply_url?: string;
 }
 
+const remoteOkCache = new MemoryCache<Job[]>(15 * 60 * 1000);
+
 /**
  * 100% Free Public API client for RemoteOK (Zero API keys, zero authentication required)
  * https://remoteok.com/api
@@ -25,6 +28,12 @@ export class RemoteOkClient {
   private readonly baseUrl = "https://remoteok.com/api";
 
   async getJobs(limit = 30): Promise<Job[]> {
+    const cacheKey = `remoteok_jobs_${limit}`;
+    const cached = remoteOkCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -89,6 +98,7 @@ export class RemoteOkClient {
         }
       }
 
+      remoteOkCache.set(cacheKey, normalizedJobs);
       return normalizedJobs;
     } catch {
       // Graceful error isolation: if remoteok times out or fails, fail silently

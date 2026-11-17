@@ -90,7 +90,7 @@ export function JobCard({ job }: JobCardProps) {
 
               <button
                 type="button"
-                onClick={() => toggleSave(job.id)}
+                onClick={() => toggleSave(job)}
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-colors ${
                   saved
                     ? "bg-amber-50 border-amber-200 text-amber-600"

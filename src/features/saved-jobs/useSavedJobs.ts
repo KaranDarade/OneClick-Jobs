@@ -1,61 +1,142 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { SavedJob } from "@/types/job";
+import { useSyncExternalStore, useCallback, useState, useEffect } from "react";
+import { Job, SavedJob } from "@/types/job";
 
 const STORAGE_KEY = "oneclick_saved_jobs_v1";
+const SYNC_EVENT_NAME = "oneclick_saved_jobs_updated";
+
+// In-memory cache to maintain stable object identity and prevent infinite renders
+let memoryCache: SavedJob[] = [];
+let memoryCacheRaw: string | null = null;
+
+function getSnapshot(): SavedJob[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw === memoryCacheRaw) {
+      return memoryCache;
+    }
+    memoryCacheRaw = raw;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        memoryCache = parsed;
+        return memoryCache;
+      }
+    }
+    memoryCache = [];
+    return memoryCache;
+  } catch {
+    return memoryCache;
+  }
+}
+
+function getServerSnapshot(): SavedJob[] {
+  return [];
+}
+
+function subscribe(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+
+  window.addEventListener("storage", callback);
+  window.addEventListener(SYNC_EVENT_NAME, callback);
+
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(SYNC_EVENT_NAME, callback);
+  };
+}
+
+function emitChange() {
+  if (typeof window !== "undefined") {
+    // Schedule in microtask to guarantee it never fires synchronously during a React render phase
+    queueMicrotask(() => {
+      window.dispatchEvent(new Event(SYNC_EVENT_NAME));
+    });
+  }
+}
 
 export function useSavedJobs() {
-  const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
+  const savedJobs = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setSavedJobs(JSON.parse(stored));
+    setIsLoaded(true);
+  }, []);
+
+  const saveJob = useCallback((jobInput: Job | string) => {
+    if (typeof window === "undefined") return;
+
+    const id = typeof jobInput === "string" ? jobInput : jobInput.id;
+    const fullJob = typeof jobInput === "object" ? jobInput : undefined;
+
+    const current = getSnapshot();
+    const existingIndex = current.findIndex((item) => item.jobId === id);
+    let updated: SavedJob[];
+
+    if (existingIndex >= 0) {
+      if (fullJob && !current[existingIndex].job) {
+        updated = [...current];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          job: fullJob,
+        };
+      } else {
+        return;
       }
-    } catch {
-      // In SSR or if localStorage is restricted
-    } finally {
-      setIsLoaded(true);
+    } else {
+      updated = [
+        ...current,
+        {
+          jobId: id,
+          savedAt: new Date().toISOString(),
+          job: fullJob,
+        },
+      ];
+    }
+
+    try {
+      const serialized = JSON.stringify(updated);
+      localStorage.setItem(STORAGE_KEY, serialized);
+      memoryCacheRaw = serialized;
+      memoryCache = updated;
+      emitChange();
+    } catch (err) {
+      console.error("Failed to save job to localStorage", err);
     }
   }, []);
 
-  const saveJob = useCallback((jobId: string) => {
-    setSavedJobs((prev) => {
-      if (prev.some((item) => item.jobId === jobId)) return prev;
-      const updated = [...prev, { jobId, savedAt: new Date().toISOString() }];
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      } catch (err) {
-        console.error("Failed to save job to localStorage", err);
-      }
-      return updated;
-    });
-  }, []);
-
   const removeJob = useCallback((jobId: string) => {
-    setSavedJobs((prev) => {
-      const updated = prev.filter((item) => item.jobId !== jobId);
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      } catch (err) {
-        console.error("Failed to remove job from localStorage", err);
-      }
-      return updated;
-    });
+    if (typeof window === "undefined") return;
+
+    const current = getSnapshot();
+    const updated = current.filter((item) => item.jobId !== jobId);
+
+    try {
+      const serialized = JSON.stringify(updated);
+      localStorage.setItem(STORAGE_KEY, serialized);
+      memoryCacheRaw = serialized;
+      memoryCache = updated;
+      emitChange();
+    } catch (err) {
+      console.error("Failed to remove job from localStorage", err);
+    }
   }, []);
 
   const toggleSave = useCallback(
-    (jobId: string) => {
-      if (savedJobs.some((j) => j.jobId === jobId)) {
-        removeJob(jobId);
+    (jobInput: Job | string) => {
+      const id = typeof jobInput === "string" ? jobInput : jobInput.id;
+      const current = getSnapshot();
+      if (current.some((j) => j.jobId === id)) {
+        removeJob(id);
       } else {
-        saveJob(jobId);
+        saveJob(jobInput);
       }
     },
-    [savedJobs, removeJob, saveJob]
+    [removeJob, saveJob]
   );
 
   const isSaved = useCallback(

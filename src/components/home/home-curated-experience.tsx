@@ -23,6 +23,8 @@ import { Job, SearchFilters, SortOption, RoleCategory, WorkArrangement } from "@
 import { filterAndSortJobs } from "@/features/job-search/search";
 import { DEMO_JOBS, POPULAR_INDIAN_CITIES } from "@/features/job-search/fixtures";
 import { JobCard } from "@/components/jobs/job-card";
+import { JobRowItem } from "@/components/jobs/job-row-item";
+import { JobTable } from "@/components/jobs/job-table";
 import { FilterPanel } from "@/components/filters/filter-panel";
 import { SearchControls } from "@/components/filters/search-controls";
 import { Pagination } from "@/components/ui/pagination";
@@ -186,6 +188,22 @@ export function HomeCuratedExperience() {
     const start = (currentPage - 1) * PAGE_SIZE;
     return searchResult.jobs.slice(start, start + PAGE_SIZE);
   }, [searchResult.jobs, currentPage]);
+
+  // Compute live city and job type counts for sidebar filter badges
+  const { cityCounts, jobTypeCounts } = useMemo(() => {
+    const cCounts: Record<string, number> = {};
+    const jCounts: Record<string, number> = {};
+
+    for (const job of activeDataset) {
+      const city = job.normalizedCity || "Others";
+      cCounts[city] = (cCounts[city] || 0) + 1;
+
+      const type = job.employmentType || "full-time";
+      jCounts[type] = (jCounts[type] || 0) + 1;
+    }
+
+    return { cityCounts: cCounts, jobTypeCounts: jCounts };
+  }, [activeDataset]);
 
   // Handle PDF Resume Upload
   const handleUploadResume = async (file: File) => {
@@ -459,7 +477,7 @@ export function HomeCuratedExperience() {
 
       {/* Main Job Feed Section (10 Jobs Per Page) */}
       <section className="py-10 bg-white min-h-[600px]">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900 flex items-center gap-2">
@@ -488,15 +506,18 @@ export function HomeCuratedExperience() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* Left Filter Panel */}
-            <div className="hidden lg:block lg:col-span-4">
+            <div className="hidden lg:block lg:col-span-3">
               <div className="sticky top-20">
                 <FilterPanel
                   filters={filters}
                   onFilterChange={setFilters}
+                  cityCounts={cityCounts}
+                  jobTypeCounts={jobTypeCounts}
                   onReset={() =>
                     setFilters({
                       query: "",
                       location: "All India",
+                      selectedCities: [],
                       workArrangements: [],
                       experienceLevels: [],
                       employmentTypes: [],
@@ -511,8 +532,8 @@ export function HomeCuratedExperience() {
               </div>
             </div>
 
-            {/* Right Job Cards Feed */}
-            <div className="lg:col-span-8 space-y-4">
+            {/* Right Job Table Feed */}
+            <div className="lg:col-span-9 space-y-4">
               <SearchControls
                 filters={filters}
                 onFilterChange={setFilters}
@@ -520,10 +541,15 @@ export function HomeCuratedExperience() {
                 totalResults={searchResult.totalCount}
               />
 
+              {/* Subtitle / Curation Notice matching screenshot */}
+              <div className="px-1 py-1 text-xs text-neutral-500 leading-relaxed">
+                Handpicked daily by our placement team from LinkedIn, Naukri, Internshala and company career pages. Apply opens the original posting.
+              </div>
+
               {isLoading && !apiData ? (
                 <div className="space-y-3 pt-2">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-28 rounded-2xl border border-neutral-200 bg-white p-4 animate-pulse">
+                    <div key={i} className="h-20 rounded-xl border border-neutral-200 bg-white p-4 animate-pulse">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-neutral-100" />
                         <div className="space-y-2 flex-1">
@@ -551,6 +577,7 @@ export function HomeCuratedExperience() {
                       setFilters({
                         query: "",
                         location: "All India",
+                        selectedCities: [],
                         workArrangements: [],
                         experienceLevels: [],
                         employmentTypes: [],
@@ -566,10 +593,9 @@ export function HomeCuratedExperience() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {paginatedJobs.map((job) => (
-                    <JobCard key={job.id} job={job} />
-                  ))}
+                <div className="space-y-4">
+                  {/* Semantic Unified Table with 100% Column Alignment */}
+                  <JobTable jobs={paginatedJobs} />
 
                   {/* 10 Jobs Per Page Pagination */}
                   <Pagination
@@ -646,10 +672,13 @@ export function HomeCuratedExperience() {
               <FilterPanel
                 filters={filters}
                 onFilterChange={setFilters}
+                cityCounts={cityCounts}
+                jobTypeCounts={jobTypeCounts}
                 onReset={() =>
                   setFilters({
                     query: "",
                     location: "All India",
+                    selectedCities: [],
                     workArrangements: [],
                     experienceLevels: [],
                     employmentTypes: [],

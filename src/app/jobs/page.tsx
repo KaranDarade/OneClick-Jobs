@@ -6,6 +6,8 @@ import { SearchFilters, SortOption, Job } from "@/types/job";
 import { filterAndSortJobs } from "@/features/job-search/search";
 import { DEMO_JOBS } from "@/features/job-search/fixtures";
 import { JobCard } from "@/components/jobs/job-card";
+import { JobRowItem } from "@/components/jobs/job-row-item";
+import { JobTable } from "@/components/jobs/job-table";
 import { FilterPanel } from "@/components/filters/filter-panel";
 import { SearchControls } from "@/components/filters/search-controls";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -180,13 +182,31 @@ function JobsContent() {
     return searchResult.jobs.slice(start, start + PAGE_SIZE);
   }, [searchResult.jobs, currentPage]);
 
+  // Compute live city and job type counts for sidebar filter badges
+  const { cityCounts, jobTypeCounts } = useMemo(() => {
+    const cCounts: Record<string, number> = {};
+    const jCounts: Record<string, number> = {};
+
+    for (const job of activeDataset) {
+      const city = job.normalizedCity || "Others";
+      cCounts[city] = (cCounts[city] || 0) + 1;
+
+      const type = job.employmentType || "full-time";
+      jCounts[type] = (jCounts[type] || 0) + 1;
+    }
+
+    return { cityCounts: cCounts, jobTypeCounts: jCounts };
+  }, [activeDataset]);
+
   const handleResetFilters = () => {
     setFilters({
       query: "",
       location: "All India",
+      selectedCities: [],
       workArrangements: [],
       experienceLevels: [],
       employmentTypes: [],
+      roleCategories: [],
       isFresherOnly: false,
       postingAge: null,
       sortBy: "relevance",
@@ -197,7 +217,7 @@ function JobsContent() {
   const isDemoFallback = apiData?.source === "demo-fallback";
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       {/* JevJobs Status Indicator Ribbon */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white p-3.5 shadow-2xs">
         <div className="flex items-center gap-2.5">
@@ -271,14 +291,16 @@ function JobsContent() {
         </div>
       )}
 
-      {/* Main 2-Panel Results Layout matching JevJobs */}
+      {/* Main 2-Panel Results Layout matching reference */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left Filters Panel */}
-        <div className="hidden lg:block lg:col-span-4">
+        <div className="hidden lg:block lg:col-span-3">
           <div className="sticky top-20">
             <FilterPanel
               filters={filters}
               onFilterChange={setFilters}
+              cityCounts={cityCounts}
+              jobTypeCounts={jobTypeCounts}
               onReset={handleResetFilters}
               totalResults={searchResult.totalCount}
             />
@@ -286,7 +308,7 @@ function JobsContent() {
         </div>
 
         {/* Right Search & Matches Panel */}
-        <div className="lg:col-span-8 space-y-4">
+        <div className="lg:col-span-9 space-y-4">
           <SearchControls
             filters={filters}
             onFilterChange={setFilters}
@@ -294,13 +316,18 @@ function JobsContent() {
             totalResults={searchResult.totalCount}
           />
 
+          {/* Subtitle / Curation Notice matching screenshot */}
+          <div className="px-1 py-1 text-xs text-neutral-500 leading-relaxed">
+            Handpicked daily by our placement team from LinkedIn, Naukri, Internshala and company career pages. Apply opens the original posting.
+          </div>
+
           {/* Job Cards Stream */}
           {isLoading && !apiData ? (
             <div className="space-y-3 pt-2">
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
-                  className="h-28 rounded-xl border border-neutral-200 bg-white p-4 animate-pulse"
+                  className="h-20 rounded-xl border border-neutral-200 bg-white p-4 animate-pulse"
                 >
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-xl bg-neutral-100 shrink-0" />
@@ -332,10 +359,9 @@ function JobsContent() {
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              {paginatedJobs.map((job) => (
-                <JobCard key={job.id} job={job} />
-              ))}
+            <div className="space-y-4">
+              {/* Semantic Unified Table with 100% Column Alignment */}
+              <JobTable jobs={paginatedJobs} />
 
               {/* 10 Jobs Per Page Pagination */}
               <Pagination
@@ -374,6 +400,8 @@ function JobsContent() {
               <FilterPanel
                 filters={filters}
                 onFilterChange={setFilters}
+                cityCounts={cityCounts}
+                jobTypeCounts={jobTypeCounts}
                 onReset={handleResetFilters}
                 totalResults={searchResult.totalCount}
               />

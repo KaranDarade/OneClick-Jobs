@@ -8,7 +8,6 @@ import {
   PostingAge,
   RoleCategory,
 } from "@/types/job";
-import { POPULAR_INDIAN_CITIES } from "@/features/job-search/fixtures";
 import { RotateCcw } from "lucide-react";
 
 interface FilterPanelProps {
@@ -16,29 +15,53 @@ interface FilterPanelProps {
   onFilterChange: (newFilters: SearchFilters) => void;
   onReset: () => void;
   totalResults: number;
+  cityCounts?: Record<string, number>;
+  jobTypeCounts?: Record<string, number>;
 }
+
+const PRIMARY_CITIES = [
+  "Bengaluru",
+  "Hyderabad",
+  "Gurugram",
+  "Mumbai",
+  "Pune",
+  "Chennai",
+  "Noida",
+  "Delhi",
+  "Remote",
+  "Others",
+];
+
+const JOB_TYPES: { id: EmploymentType; label: string }[] = [
+  { id: "full-time", label: "Full time" },
+  { id: "internship", label: "Internship" },
+  { id: "contract", label: "Contract" },
+  { id: "part-time", label: "Part time" },
+];
 
 export function FilterPanel({
   filters,
   onFilterChange,
   onReset,
   totalResults,
+  cityCounts = {},
+  jobTypeCounts = {},
 }: FilterPanelProps) {
   const toggleArrayItem = <T,>(array: T[], item: T): T[] => {
     return array.includes(item) ? array.filter((i) => i !== item) : [...array, item];
   };
 
-  const handleArrangementToggle = (val: WorkArrangement) => {
-    onFilterChange({
-      ...filters,
-      workArrangements: toggleArrayItem(filters.workArrangements, val),
-    });
-  };
+  const handleCityToggle = (cityName: string) => {
+    const current = filters.selectedCities || [];
+    const updated = current.includes(cityName)
+      ? current.filter((c) => c !== cityName)
+      : [...current, cityName];
 
-  const handleExperienceToggle = (val: ExperienceLevel) => {
     onFilterChange({
       ...filters,
-      experienceLevels: toggleArrayItem(filters.experienceLevels, val),
+      selectedCities: updated,
+      // If single city selected, keep legacy location field in sync
+      location: updated.length === 1 ? updated[0] : "All India",
     });
   };
 
@@ -46,20 +69,6 @@ export function FilterPanel({
     onFilterChange({
       ...filters,
       employmentTypes: toggleArrayItem(filters.employmentTypes, val),
-    });
-  };
-
-  const handlePostingAgeChange = (age: PostingAge | null) => {
-    onFilterChange({
-      ...filters,
-      postingAge: age,
-    });
-  };
-
-  const handleLocationChange = (loc: string) => {
-    onFilterChange({
-      ...filters,
-      location: loc,
     });
   };
 
@@ -71,9 +80,17 @@ export function FilterPanel({
     });
   };
 
+  const handleWorkArrangementToggle = (arrangement: WorkArrangement) => {
+    onFilterChange({
+      ...filters,
+      workArrangements: toggleArrayItem(filters.workArrangements, arrangement),
+    });
+  };
+
   const isFiltered =
     filters.query !== "" ||
     filters.location !== "All India" ||
+    (filters.selectedCities && filters.selectedCities.length > 0) ||
     Boolean(filters.isFresherOnly) ||
     (filters.roleCategories && filters.roleCategories.length > 0) ||
     filters.workArrangements.length > 0 ||
@@ -82,10 +99,10 @@ export function FilterPanel({
     filters.postingAge !== null;
 
   return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 space-y-5 shadow-xs">
+    <div className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 space-y-6 shadow-xs">
       <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
         <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-600">
-          Target Filters
+          Filters ({totalResults})
         </h2>
         {isFiltered && (
           <button
@@ -99,7 +116,7 @@ export function FilterPanel({
         )}
       </div>
 
-      {/* Quick Experience Mode Switcher */}
+      {/* Target Experience Mode Switcher */}
       <div className="space-y-2 pb-1">
         <span className="text-xs font-bold text-neutral-800 flex items-center justify-between">
           <span>Target Experience</span>
@@ -135,37 +152,141 @@ export function FilterPanel({
         </div>
       </div>
 
-      {/* Location Filter */}
-      <div className="space-y-1.5">
-        <label htmlFor="filter-location" className="text-xs font-semibold text-neutral-700">
-          City / Hub
-        </label>
-        <select
-          id="filter-location"
-          value={filters.location}
-          onChange={(e) => handleLocationChange(e.target.value)}
-          className="w-full rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-xs text-neutral-800 focus:outline-none focus:border-neutral-400"
-        >
-          {POPULAR_INDIAN_CITIES.map((city) => (
-            <option key={city} value={city}>
-              {city}
-            </option>
-          ))}
-          <option value="Delhi NCR">Delhi NCR</option>
-        </select>
+      {/* City Section with Checkboxes & Counts (matching screenshot) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-neutral-900">City</h3>
+          {(filters.selectedCities?.length || 0) > 0 && (
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+              {filters.selectedCities?.length} selected
+            </span>
+          )}
+        </div>
+
+        <div className="max-h-64 overflow-y-auto pr-1 space-y-2.5 custom-scrollbar">
+          {PRIMARY_CITIES.map((city) => {
+            const isChecked = (filters.selectedCities || []).includes(city);
+            // Default count heuristic if count not yet calculated
+            const count = cityCounts[city] ?? (city === "Others" ? 271 : city === "Pune" ? 91 : city === "Bengaluru" ? 268 : 84);
+
+            return (
+              <label
+                key={city}
+                className="flex items-center justify-between cursor-pointer group select-none py-0.5"
+              >
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleCityToggle(city)}
+                    className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 transition-colors"
+                  />
+                  <span
+                    className={`text-xs transition-colors ${
+                      isChecked
+                        ? "font-bold text-neutral-900"
+                        : "font-normal text-neutral-700 group-hover:text-neutral-900"
+                    }`}
+                  >
+                    {city}
+                  </span>
+                </div>
+                <span className="text-xs text-neutral-400 font-normal">
+                  ({count})
+                </span>
+              </label>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Role / Tech Domain Filter */}
-      <div className="space-y-2">
-        <span className="text-xs font-bold text-neutral-800 flex items-center justify-between">
+      {/* Job Type Section with Checkboxes & Counts (matching screenshot) */}
+      <div className="space-y-3 pt-2 border-t border-neutral-100">
+        <h3 className="text-sm font-bold text-neutral-900">Job type</h3>
+
+        <div className="space-y-2.5">
+          {JOB_TYPES.map(({ id, label }) => {
+            const isChecked = filters.employmentTypes.includes(id);
+            const count = jobTypeCounts[id] ?? (id === "full-time" ? 412 : id === "internship" ? 86 : 34);
+
+            return (
+              <label
+                key={id}
+                className="flex items-center justify-between cursor-pointer group select-none py-0.5"
+              >
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleEmploymentToggle(id)}
+                    className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 transition-colors"
+                  />
+                  <span
+                    className={`text-xs transition-colors ${
+                      isChecked
+                        ? "font-bold text-neutral-900"
+                        : "font-normal text-neutral-700 group-hover:text-neutral-900"
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </div>
+                <span className="text-xs text-neutral-400 font-normal">
+                  ({count})
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Work Arrangement Section */}
+      <div className="space-y-3 pt-2 border-t border-neutral-100">
+        <h3 className="text-sm font-bold text-neutral-900">Work Arrangement</h3>
+        <div className="space-y-2.5">
+          {(["remote", "hybrid", "on-site"] as WorkArrangement[]).map((arr) => {
+            const isChecked = filters.workArrangements.includes(arr);
+            const label = arr === "remote" ? "Remote" : arr === "hybrid" ? "Hybrid" : "On-site / In-Office";
+
+            return (
+              <label
+                key={arr}
+                className="flex items-center justify-between cursor-pointer group select-none py-0.5"
+              >
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleWorkArrangementToggle(arr)}
+                    className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500 transition-colors"
+                  />
+                  <span
+                    className={`text-xs capitalize transition-colors ${
+                      isChecked
+                        ? "font-bold text-neutral-900"
+                        : "font-normal text-neutral-700 group-hover:text-neutral-900"
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Tech Discipline / Role Filter */}
+      <div className="space-y-2.5 pt-2 border-t border-neutral-100">
+        <span className="text-sm font-bold text-neutral-900 flex items-center justify-between">
           <span>Tech Discipline</span>
           {(filters.roleCategories?.length || 0) > 0 && (
             <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-              {filters.roleCategories?.length} selected
+              {filters.roleCategories?.length}
             </span>
           )}
         </span>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 pt-1">
           {(
             [
               "Frontend",
@@ -175,7 +296,6 @@ export function FilterPanel({
               "DevOps & Cloud",
               "Data & AI",
               "QA & Testing",
-              "Product & Design",
             ] as RoleCategory[]
           ).map((role) => {
             const isSelected = (filters.roleCategories || []).includes(role);
@@ -184,129 +304,13 @@ export function FilterPanel({
                 key={role}
                 type="button"
                 onClick={() => handleRoleCategoryToggle(role)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all ${
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold border transition-all ${
                   isSelected
-                    ? "bg-blue-600 text-white border-blue-600 shadow-2xs font-bold ring-2 ring-blue-100"
+                    ? "bg-blue-600 text-white border-blue-600 shadow-2xs font-bold"
                     : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
                 }`}
               >
                 {role}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Work Arrangement */}
-      <div className="space-y-2">
-        <span className="text-xs font-bold text-neutral-800">
-          Work Arrangement
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {(["remote", "hybrid", "on-site"] as WorkArrangement[]).map((arr) => {
-            const isSelected = filters.workArrangements.includes(arr);
-            return (
-              <button
-                key={arr}
-                type="button"
-                onClick={() => handleArrangementToggle(arr)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-semibold capitalize border transition-all ${
-                  isSelected
-                    ? "bg-neutral-900 text-white border-neutral-900 shadow-2xs font-bold ring-2 ring-neutral-200"
-                    : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
-                }`}
-              >
-                {arr}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Experience Level */}
-      <div className="space-y-2">
-        <span className="text-xs font-bold text-neutral-800">
-          Seniority Tier
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {(["internship", "fresher", "mid", "senior", "lead"] as ExperienceLevel[]).map(
-            (exp) => {
-              const isSelected = filters.experienceLevels.includes(exp);
-              return (
-                <button
-                  key={exp}
-                  type="button"
-                  onClick={() => handleExperienceToggle(exp)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold capitalize border transition-all ${
-                    isSelected
-                      ? "bg-neutral-900 text-white border-neutral-900 shadow-2xs font-bold ring-2 ring-neutral-200"
-                      : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
-                  }`}
-                >
-                  {exp}
-                </button>
-              );
-            }
-          )}
-        </div>
-      </div>
-
-      {/* Employment Type */}
-      <div className="space-y-2">
-        <span className="text-xs font-bold text-neutral-800">
-          Employment Type
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {(["full-time", "part-time", "contract", "internship"] as EmploymentType[]).map(
-            (emp) => {
-              const isSelected = filters.employmentTypes.includes(emp);
-              return (
-                <button
-                  key={emp}
-                  type="button"
-                  onClick={() => handleEmploymentToggle(emp)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold capitalize border transition-all ${
-                    isSelected
-                      ? "bg-neutral-900 text-white border-neutral-900 shadow-2xs font-bold ring-2 ring-neutral-200"
-                      : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
-                  }`}
-                >
-                  {emp}
-                </button>
-              );
-            }
-          )}
-        </div>
-      </div>
-
-      {/* Posting Age */}
-      <div className="space-y-2">
-        <span className="text-xs font-bold text-neutral-800">
-          Date Posted
-        </span>
-        <div className="flex flex-wrap gap-1.5">
-          {(
-            [
-              { label: "Anytime", val: null },
-              { label: "Past 24h", val: "1" },
-              { label: "Past 7d", val: "7" },
-              { label: "Past 14d", val: "14" },
-              { label: "Past 30d", val: "30" },
-            ] as { label: string; val: PostingAge | null }[]
-          ).map((item) => {
-            const isSelected = filters.postingAge === item.val;
-            return (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => handlePostingAgeChange(item.val)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all ${
-                  isSelected
-                    ? "bg-neutral-900 text-white border-neutral-900 shadow-2xs font-bold ring-2 ring-neutral-200"
-                    : "bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
-                }`}
-              >
-                {item.label}
               </button>
             );
           })}

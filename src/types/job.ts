@@ -81,6 +81,7 @@ export type JobStatus = 'active' | 'expired' | 'unknown';
 export interface SearchFilters {
   query: string;
   location: string; // "all" or specific city
+  selectedCities?: string[];
   workArrangements: WorkArrangement[];
   experienceLevels: ExperienceLevel[];
   employmentTypes: EmploymentType[];
@@ -103,4 +104,5 @@ export interface SearchResult {
 export interface SavedJob {
   jobId: string;
   savedAt: string;
+  job?: Job;
 }

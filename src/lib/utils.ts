@@ -61,3 +61,58 @@ export function formatTimeAgo(isoDate: string | null): string {
     return "Recently";
   }
 }
+
+export function formatShortDate(isoDate: string | null): string {
+  if (!isoDate) return "Recent";
+  try {
+    const date = new Date(isoDate);
+    if (isNaN(date.getTime())) return "Recent";
+    const day = date.getDate();
+    const months = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+    return `${day} ${months[date.getMonth()]}`;
+  } catch {
+    return "Recent";
+  }
+}
+
+export function getJobSourceAttribution(job: {
+  source?: string;
+  sourceUrl?: string;
+  originalUrl?: string;
+  sourceAttribution?: string;
+  providerId?: string;
+  company?: string;
+}): string {
+  if (job.sourceAttribution) {
+    if (job.sourceAttribution.toLowerCase().startsWith("via ")) return job.sourceAttribution;
+    return `via ${job.sourceAttribution}`;
+  }
+  const url = (job.originalUrl || job.sourceUrl || "").toLowerCase();
+  const source = (job.source || job.providerId || "").toLowerCase();
+
+  if (url.includes("linkedin.com") || source.includes("linkedin")) {
+    return "via Linkedin";
+  }
+  if (url.includes("indeed.com") || source.includes("indeed")) {
+    return "via Indeed";
+  }
+  if (url.includes("naukri.com") || source.includes("naukri")) {
+    return "via Naukri";
+  }
+  if (url.includes("greenhouse.io") || source.includes("greenhouse")) {
+    return "via Greenhouse";
+  }
+  if (url.includes("lever.co") || source.includes("lever")) {
+    return "via Lever";
+  }
+  if (url.includes("ashbyhq.com") || source.includes("ashby")) {
+    return "via Ashby";
+  }
+  if (url.includes("remoteok") || source.includes("remoteok")) {
+    return "via RemoteOK";
+  }
+  return "via Company's Career Page";
+}

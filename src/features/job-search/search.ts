@@ -98,6 +98,25 @@ export function filterAndSortJobs(
       }
     }
 
+    // 2.1 Multi-City Selection Filter (from sidebar checkboxes)
+    if (filters.selectedCities && filters.selectedCities.length > 0) {
+      const matchesAnySelectedCity = filters.selectedCities.some((city) =>
+        matchesLocationFilter(
+          {
+            city: job.normalizedCity,
+            state: job.normalizedState,
+            original: job.originalLocation,
+            isIndiaRemote: job.remoteEligibility?.toLowerCase().includes("india") || false,
+            workArrangement: job.workArrangement,
+          },
+          city
+        )
+      );
+      if (!matchesAnySelectedCity) {
+        return false;
+      }
+    }
+
     // 3. Work Arrangement (Multiple Checkboxes)
     if (filters.workArrangements && filters.workArrangements.length > 0) {
       if (!filters.workArrangements.includes(job.workArrangement)) {
